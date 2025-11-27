@@ -1,0 +1,125 @@
+Dovresti vedere: "VITE v7.2.4 ready in xxx ms"
+
+PASSO 2: VERIFICA TUTTO FUNZIONA
+
+Browser:
+1. Vai su http://localhost:5173
+2. Fai login con francescociniero@yahoo.de
+3. Dovresti vedere la Dashboard
+
+PASSO 3: INIZIA NUOVA CHAT CON CLAUDE
+
+Scrivi a Claude:
+"Ciao! Ho il progetto Chlorophy AI salvato su GitHub 
+(https://github.com/neurowebstudioadmin/chlorophy-ai).
+
+Ho completato WEEK 1 - DAY 1:
+- Setup completo (React + Express + Supabase + Anthropic)
+- Sistema autenticazione funzionante
+- Dashboard con logout
+- Logo professionale
+
+Path locale: C:\Users\franc\Desktop\chlorophy-ai\
+
+Ora voglio costruire la PROSSIMA FASE: AI Builder page con chat interface 
+collegata a Claude API per generare websites.
+
+Iniziamo con il backend: creare l'endpoint /api/ai/generate che usa 
+l'Anthropic API per generare codice HTML da prompt utente.
+
+Procediamo uno step alla volta come prima. Sono pronto!"
+
+═══════════════════════════════════════════════════════════════════════════
+📦 ENVIRONMENT VARIABLES (GIÀ CONFIGURATE)
+═══════════════════════════════════════════════════════════════════════════
+
+Frontend (.env):
+VITE_SUPABASE_URL=https://coxjgejlijebakitlkso.supabase.co
+VITE_SUPABASE_ANON_KEY=[la tua anon key]
+VITE_API_URL=http://localhost:3001
+
+Backend (.env):
+SUPABASE_URL=https://coxjgejlijebakitlkso.supabase.co
+SUPABASE_SERVICE_KEY=[la tua service key]
+ANTHROPIC_API_KEY=[la tua anthropic key sk-ant-...]
+PORT=3001
+NODE_ENV=development
+JWT_SECRET=chlorophy2025supersecretkey987654321
+FRONTEND_URL=http://localhost:5173
+
+═══════════════════════════════════════════════════════════════════════════
+🗂️ STRUTTURA PROGETTO ATTUALE
+═══════════════════════════════════════════════════════════════════════════
+
+chlorophy-ai/
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── auth/
+│   │   │   │   ├── LoginForm.jsx ✅
+│   │   │   │   └── SignupForm.jsx ✅
+│   │   │   ├── dashboard/
+│   │   │   │   └── Dashboard.jsx ✅
+│   │   │   └── Logo.jsx ✅
+│   │   ├── services/
+│   │   │   └── supabase.js ✅
+│   │   ├── App.jsx ✅
+│   │   ├── main.jsx ✅
+│   │   └── index.css ✅
+│   ├── .env ✅
+│   └── package.json ✅
+│
+├── backend/
+│   ├── src/
+│   │   └── server.js ✅
+│   ├── .env ✅
+│   └── package.json ✅
+│
+├── .gitignore ✅
+├── README.md ✅
+└── START-HERE-TOMORROW.txt ✅ (questo file)
+
+═══════════════════════════════════════════════════════════════════════════
+⚠️ NOTE IMPORTANTI
+═══════════════════════════════════════════════════════════════════════════
+
+1. NON MODIFICARE I FILE .env - Le credenziali sono già corrette
+2. Sempre lavorare con 2 terminal aperti (backend + frontend)
+3. Se serve installare nuovi pacchetti npm, farlo prima di avviare i server
+4. Git è già configurato con user.name="neurowebstudioadmin" e 
+   user.email="neurowebstudio@gmail.com"
+5. Per salvare su GitHub dopo nuove modifiche:
+   git add .
+   git commit -m "Descrizione modifiche"
+   git push origin main
+
+═══════════════════════════════════════════════════════════════════════════
+🎯 OBIETTIVO FINALE CHLOROPHY AI
+═══════════════════════════════════════════════════════════════════════════
+
+MVP (Minimum Viable Product):
+- ✅ Authentication (FATTO)
+- ✅ Dashboard (FATTO)
+- ☐ AI Builder con Claude (PROSSIMO)
+- ☐ Live Preview (PROSSIMO)
+- ☐ Project Save (PROSSIMO)
+- ☐ Template Marketplace (DOPO)
+- ☐ Download ZIP (DOPO)
+- ☐ Deploy integrations (DOPO)
+
+Timeline stimato: 6 settimane per MVP completo
+Settimana 1: Auth + AI Builder (IN CORSO)
+Settimana 2: Templates + Customization
+Settimana 3: Projects Management + Export
+Settimana 4: Polish UI/UX
+Settimana 5: Testing + Bug fixes
+Settimana 6: Launch preparation
+
+═══════════════════════════════════════════════════════════════════════════
+💪 SEI PRONTO PER LA PROSSIMA FASE!
+═══════════════════════════════════════════════════════════════════════════
+
+Hai costruito fondamenta solide. Ora costruiamo il CUORE di Chlorophy: 
+l'AI che genera websites! 🚀🌿
+
+Buon lavoro Francesco! 💚
