@@ -71,14 +71,17 @@ export default function Dashboard() {
         <h1 className="text-3xl font-bold text-gray-800 mb-8">
           Welcome to Chlorophy AI! 🌿
         </h1>
-
+        
         <div className="bg-white rounded-lg shadow-md p-8">
           <h2 className="text-xl font-semibold mb-4">My Projects</h2>
           <p className="text-gray-600">
             Your projects will appear here. Start creating with AI! 🚀
           </p>
           
-          <button className="mt-6 px-6 py-3 bg-chlorophy-green text-white font-bold rounded-lg hover:bg-chlorophy-cyan transition">
+          <button 
+            onClick={() => navigate('/builder')}
+            className="mt-6 px-6 py-3 bg-chlorophy-green text-white font-bold rounded-lg hover:bg-chlorophy-cyan transition"
+          >
             + New Project
           </button>
         </div>

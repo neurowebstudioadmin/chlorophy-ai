@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import aiRoutes from './routes/ai.js';
 
 dotenv.config();
 
@@ -13,6 +14,9 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173'
 }));
 app.use(express.json());
+
+// AI Routes
+app.use('/api/ai', aiRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
