@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
 import Dashboard from './pages/Dashboard';
@@ -5,8 +6,11 @@ import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import Billing from './pages/Billing';
 import Builder from './components/builder/Builder';
+import LoginForm from './components/auth/LoginForm';
+import SignupForm from './components/auth/SignupForm';
+import { authService } from './services/supabase';
 
-// Placeholder pages (da implementare dopo)
+// Placeholder pages
 function Projects() {
   return (
     <div className="p-8">
@@ -31,24 +35,81 @@ function Stats() {
   );
 }
 
-function App() {
-  // Mock user data (replace with real auth later)
-  const userEmail = 'francesco@chlorophy.ai';
-  const isAuthenticated = true; // Replace with real auth check
+// Protected Route Component
+function ProtectedRoute({ children }) {
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" />;
+  useEffect(() => {
+    // Check current user
+    authService.getCurrentUser()
+      .then(user => {
+        setUser(user);
+        setLoading(false);
+      })
+      .catch(() => {
+        setUser(null);
+        setLoading(false);
+      });
+
+    // Listen for auth changes
+    const { data: { subscription } } = authService.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+      } else if (session) {
+        setUser(session.user);
+      }
+    });
+
+    return () => subscription?.unsubscribe();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0A0E27' }}>
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
   }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+}
+
+function App() {
+  const [userEmail, setUserEmail] = useState('francesco@chlorophy.ai');
+
+  useEffect(() => {
+    // Get user email on mount
+    authService.getCurrentUser()
+      .then(user => {
+        if (user?.email) {
+          setUserEmail(user.email);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <Router>
       <Routes>
-        {/* Main App with Sidebar */}
-        <Route path="/" element={<MainLayout userEmail={userEmail} />}>
-          {/* Redirect root to dashboard */}
+        {/* Public Routes */}
+        <Route path="/login" element={<LoginForm />} />
+        <Route path="/signup" element={<SignupForm />} />
+
+        {/* Protected Routes */}
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <MainLayout userEmail={userEmail} />
+            </ProtectedRoute>
+          }
+        >
           <Route index element={<Navigate to="/dashboard" replace />} />
-          
-          {/* Main Routes */}
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="builder" element={<Builder />} />
           <Route path="projects" element={<Projects />} />
@@ -59,7 +120,7 @@ function App() {
           <Route path="profile" element={<Profile />} />
         </Route>
 
-        {/* Catch all - redirect to dashboard */}
+        {/* Catch all */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Router>

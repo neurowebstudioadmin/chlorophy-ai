@@ -36,16 +36,34 @@ export default function Sidebar({ isCollapsed, setIsCollapsed, userEmail = 'user
   const location = useLocation();
   const [hoveredItem, setHoveredItem] = useState(null);
 
-  const handleNavigation = (path, id) => {
-    if (id === 'logout') {
-      if (window.confirm('Are you sure you want to logout?')) {
+  const handleNavigation = async (path, id) => {
+  if (id === 'logout') {
+    if (window.confirm('Are you sure you want to logout?')) {
+      try {
+        // Importa authService
+        const { authService } = await import('../../services/supabase');
+        
+        // Supabase logout
+        await authService.signOut();
+        
+        // Pulisci storage
         localStorage.clear();
-        navigate('/login');
+        sessionStorage.clear();
+        
+        // Force redirect
+        window.location.replace('/login');
+      } catch (err) {
+        console.error('Logout error:', err);
+        // Anche in caso di errore, redirect
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.replace('/login');
       }
-    } else {
-      navigate(path);
     }
-  };
+  } else {
+    navigate(path);
+  }
+};
 
   const isActive = (path) => location.pathname === path;
 
