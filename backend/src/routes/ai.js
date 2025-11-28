@@ -162,7 +162,7 @@ REMEMBER: Output ONLY the HTML code, starting with <!DOCTYPE html> - nothing els
   }
 });
 
-// POST /api/ai/refine - CORREZIONI RAPIDE (no domande, azione diretta)
+// POST /api/ai/refine - MODIFICHE INTELLIGENTI E VELOCI ⚡
 router.post('/refine', async (req, res) => {
   try {
     const { messages, previousCode } = req.body;
@@ -174,49 +174,74 @@ router.post('/refine', async (req, res) => {
       });
     }
 
-    console.log('🔧 Refine request - making corrections');
+    if (!previousCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'Previous code is required for refine mode'
+      });
+    }
 
-    // PROMPT PER CORREZIONI IMMEDIATE
+    console.log('🔧 Refine request - smart modification');
+
+    const userRequest = messages[messages.length - 1].content;
+
+    // NUOVO PROMPT OTTIMIZZATO - MODIFICHE CHIRURGICHE
     const refinePrompt = `${SYSTEM_PROMPT}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ CRITICAL: YOU ARE IN REFINE MODE - IMMEDIATE ACTION
+⚡ CRITICAL: SMART REFINE MODE - SURGICAL MODIFICATIONS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-CONVERSATION HISTORY:
-${messages.map(m => `${m.role}: ${m.content}`).join('\n\n')}
+USER'S MODIFICATION REQUEST:
+"${userRequest}"
 
-${previousCode ? `PREVIOUS CODE TO IMPROVE:\n${previousCode}\n\n` : ''}
+EXISTING CODE TO MODIFY:
+${previousCode}
 
-ABSOLUTE RULES FOR REFINE MODE:
-❌ DO NOT ask questions
-❌ DO NOT request clarifications
-❌ DO NOT explain what you'll do
-✅ Take IMMEDIATE action based on the user's correction request
-✅ Output ONLY the complete corrected HTML code
-✅ Fix ALL issues mentioned by the user
-✅ Make it FULLY FUNCTIONAL (100% working features)
+YOUR TASK - INTELLIGENT ANALYSIS:
 
-USER'S CORRECTION REQUEST (LAST MESSAGE):
-${messages[messages.length - 1].content}
+1. **ANALYZE THE REQUEST** - What exactly does the user want?
+   - Is it a small change? (color, text, small feature) → Make MINIMAL modification
+   - Is it a big feature? (multilingual, new section, complex functionality) → Generate fresh code
 
-YOUR TASK:
-1. Understand what needs to be fixed/added
-2. Generate complete, corrected HTML with ALL features working
-3. If user asks for working menu → create ALL pages with proper navigation
-4. If user asks for language switcher → make it FULLY functional with complete translations
-5. If user asks for filters → make them ACTUALLY filter the products
-6. If user asks for cart → make it FULLY functional with add/remove
-7. EVERYTHING must work 100%
+2. **MODIFICATION STRATEGY:**
 
-OUTPUT FORMAT:
-- Start directly with <!DOCTYPE html>
-- Complete, production-ready HTML
-- All inline CSS and JavaScript
-- EVERY feature requested must be FULLY FUNCTIONAL
-- NO explanatory text, just code
+   FOR SMALL CHANGES (color, font, text, button style, spacing, etc.):
+   ✅ Keep 95% of existing code IDENTICAL
+   ✅ Change ONLY the specific element requested
+   ✅ Preserve all functionality, structure, and styling
+   ✅ Output complete code with minimal changes
+   
+   FOR MEDIUM CHANGES (add footer, new button, simple feature):
+   ✅ Keep 80% of existing code
+   ✅ Add the new element cleanly
+   ✅ Maintain existing design consistency
+   
+   FOR LARGE CHANGES (multilingual, major restructure, new complex features):
+   ✅ Generate fresh professional code
+   ✅ Incorporate user's request completely
+   ✅ Maintain the original design spirit
 
-REMEMBER: User is asking for corrections - ACT IMMEDIATELY, don't ask questions!`;
+3. **QUALITY RULES:**
+   - Output ONLY complete HTML (start with <!DOCTYPE html>)
+   - NO explanatory text before/after code
+   - NO markdown code blocks
+   - Everything must be FULLY FUNCTIONAL
+   - If adding multilingual: ALL content must be translatable, not just navbar
+
+4. **DECISION TREE:**
+   - "change color X to Y" → SMALL (minimal modification)
+   - "add footer" → MEDIUM (add new section)
+   - "add multilingual EN/IT/ES with complete translation" → LARGE (fresh generation)
+   - "make menu clickable" → SMALL (fix JavaScript)
+   - "add shopping cart with full functionality" → LARGE (complex feature)
+
+ANALYZE THE REQUEST AND CHOOSE THE BEST STRATEGY!
+
+REMEMBER: 
+- Small changes = Keep existing code, change only what's needed
+- Large features = Generate fresh professional code
+- Output only HTML, no explanations!`;
 
     const refineMessages = [
       {
@@ -231,11 +256,16 @@ REMEMBER: User is asking for corrections - ACT IMMEDIATELY, don't ask questions!
       console.log('✅ Code refined successfully!');
       console.log('🎯 Tokens used:', result.tokensUsed);
       
+      // Calcola la differenza per vedere quanto è cambiato
+      const changePercentage = calculateChangePercentage(previousCode, result.code);
+      console.log(`📊 Code changed: ~${changePercentage}%`);
+      
       return res.json({
         success: true,
         code: result.code,
         tokensUsed: result.tokensUsed,
-        model: result.model
+        model: result.model,
+        changePercentage: changePercentage
       });
     } else {
       console.error('❌ Refine failed:', result.error);
@@ -252,6 +282,19 @@ REMEMBER: User is asking for corrections - ACT IMMEDIATELY, don't ask questions!
     });
   }
 });
+
+// Funzione helper per calcolare percentuale di cambiamento
+function calculateChangePercentage(oldCode, newCode) {
+  if (!oldCode || !newCode) return 100;
+  
+  const oldLength = oldCode.length;
+  const newLength = newCode.length;
+  const lengthDiff = Math.abs(oldLength - newLength);
+  
+  // Calcolo approssimativo
+  const changeRatio = lengthDiff / Math.max(oldLength, newLength);
+  return Math.round(changeRatio * 100);
+}
 
 // POST /api/ai/generate-project - Genera progetto multi-file con ZIP
 router.post('/generate-project', async (req, res) => {
@@ -288,25 +331,25 @@ router.post('/generate-project', async (req, res) => {
     console.log('🎯 Tokens used:', result.tokensUsed);
 
     // Invia ZIP come base64 + HTML COMPLETO per preview (con CSS inline)
-const base64Zip = zipBuffer.toString('base64');
+    const base64Zip = zipBuffer.toString('base64');
 
-// Combina HTML + CSS + JS per preview
-const htmlFile = result.projectData.files['index.html'] || '';
-const cssFile = result.projectData.files['style.css'] || '';
-const jsFile = result.projectData.files['script.js'] || '';
+    // Combina HTML + CSS + JS per preview
+    const htmlFile = result.projectData.files['index.html'] || '';
+    const cssFile = result.projectData.files['style.css'] || '';
+    const jsFile = result.projectData.files['script.js'] || '';
 
-// Inserisci CSS e JS inline nell'HTML
-const previewHTML = htmlFile
-  .replace('</head>', `<style>${cssFile}</style></head>`)
-  .replace('</body>', `<script>${jsFile}</script></body>`);
+    // Inserisci CSS e JS inline nell'HTML
+    const previewHTML = htmlFile
+      .replace('</head>', `<style>${cssFile}</style></head>`)
+      .replace('</body>', `<script>${jsFile}</script></body>`);
 
-res.json({
-  success: true,
-  zipData: base64Zip,
-  previewHTML: previewHTML,
-  projectName: result.projectData.projectName,
-  tokensUsed: result.tokensUsed
-});
+    res.json({
+      success: true,
+      zipData: base64Zip,
+      previewHTML: previewHTML,
+      projectName: result.projectData.projectName,
+      tokensUsed: result.tokensUsed
+    });
 
   } catch (error) {
     console.error('❌ Server error:', error);

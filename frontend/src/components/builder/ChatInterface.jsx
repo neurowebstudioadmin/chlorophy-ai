@@ -14,7 +14,8 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
     const keywords = [
       'sistema', 'correggi', 'fixa', 'fix', 'modifica', 'cambia', 'aggiungi',
       'togli', 'rimuovi', 'non funziona', 'non va', 'migliora', 'perfeziona',
-      'aggiusta', 'ripara', 'manca', 'sbagliato', 'errore'
+      'aggiusta', 'ripara', 'manca', 'sbagliato', 'errore', 'colore', 'testo',
+      'titolo', 'header', 'footer', 'navbar', 'menu', 'pulsante', 'button'
     ];
     const lowerText = text.toLowerCase();
     return keywords.some(keyword => lowerText.includes(keyword));
@@ -39,7 +40,9 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
     setPrompt('');
     setIsGenerating(true);
 
+    // Se ha già generato E la richiesta è una modifica → USA REFINE
     if (hasGeneratedOnce && isRefinementRequest(currentPrompt) && generatedCode) {
+      console.log('🔧 Detected refinement request:', currentPrompt);
       await handleRefine(newHistory, currentPrompt);
       return;
     }
@@ -74,17 +77,15 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
     }
   };
 
-  // Refine (correzioni immediate)
+  // Refine (correzioni immediate) - OTTIMIZZATO
   const handleRefine = async (history, userRequest) => {
     setShowGenerateButton(false);
-    setProgressMessage('🔧 Sto correggendo il sito...');
+    setProgressMessage('⚡ Sto applicando la modifica...');
 
     const progressMessages = [
-      '🔧 Sto correggendo il sito...',
-      '⚙️ Sistemando tutte le funzionalità...',
-      '🎨 Ottimizzando il design...',
-      '💻 Rigenerando il codice...',
-      '✨ Ultimi ritocchi...'
+      '⚡ Sto applicando la modifica...',
+      '🔧 Modificando il codice esistente...',
+      '✨ Quasi fatto...'
     ];
 
     let progressIndex = 0;
@@ -93,9 +94,11 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
       if (progressIndex < progressMessages.length) {
         setProgressMessage(progressMessages[progressIndex]);
       }
-    }, 2000);
+    }, 1500);
 
     try {
+      console.log('🔧 Sending refine request with previousCode length:', generatedCode?.length);
+      
       const response = await fetch('http://localhost:3001/api/ai/refine', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -109,11 +112,13 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
       clearInterval(progressInterval);
 
       if (data.success) {
-        setProgressMessage('✅ Correzioni applicate!');
+        setProgressMessage('✅ Modifica applicata!');
+        
+        console.log('✅ Refine completed. Change percentage:', data.changePercentage + '%');
         
         const successMsg = { 
           role: 'assistant', 
-          content: '✅ Ho sistemato tutto! Guarda il nuovo risultato.',
+          content: `✅ Fatto! Ho modificato il codice (${data.changePercentage || '~'}% cambiato). Guarda il risultato!`,
           tokensUsed: data.tokensUsed
         };
         setMessages(prev => [...prev, successMsg]);
