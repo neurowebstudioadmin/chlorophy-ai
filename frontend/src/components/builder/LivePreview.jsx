@@ -121,29 +121,6 @@ export default function LivePreview({ code, isGenerating }) {
       {/* Footer Actions */}
       {code && (
         <div className="px-6 py-4 border-t border-gray-200 flex gap-3">
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(code);
-              alert('Code copied to clipboard!');
-            }}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
-          >
-            📋 Copy Code
-          </button>
-          <button
-            onClick={() => {
-              const blob = new Blob([code], { type: 'text/html' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = 'website.html';
-              a.click();
-            }}
-            className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors font-medium"
-          >
-            💾 Download HTML
-          </button>
-          
           {/* Download ZIP Button */}
           {window.chlorophyZipData && (
             <button
@@ -153,6 +130,18 @@ export default function LivePreview({ code, isGenerating }) {
               📦 Scarica ZIP
             </button>
           )}
+          
+          {/* Full Screen Preview Button */}
+          <button
+            onClick={() => {
+              const blob = new Blob([code], { type: 'text/html' });
+              const url = URL.createObjectURL(blob);
+              window.open(url, '_blank');
+            }}
+            className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-medium flex items-center gap-2"
+          >
+            🚀 Vedi Anteprima
+          </button>
         </div>
       )}
     </div>
