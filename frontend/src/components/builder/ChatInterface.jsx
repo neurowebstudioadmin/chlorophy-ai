@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Send, Sparkles, Zap } from 'lucide-react';
+import { chlorophyTheme } from '../../styles/chlorophy-theme';
 
 export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGenerating, generatedCode }) {
   const [prompt, setPrompt] = useState('');
@@ -210,58 +213,162 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg border border-gray-200 h-[calc(100vh-200px)] flex flex-col">
+    <div 
+      className="rounded-2xl backdrop-blur-xl h-full flex flex-col overflow-hidden"
+      style={{
+        background: 'rgba(10, 14, 39, 0.8)',
+        border: `1px solid ${chlorophyTheme.colors.primary}20`,
+      }}
+    >
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900">Chat con AI</h2>
-        <p className="text-sm text-gray-500">
+      <div 
+        className="px-6 py-4 border-b backdrop-blur-xl"
+        style={{
+          background: 'rgba(26, 31, 58, 0.6)',
+          borderColor: `${chlorophyTheme.colors.primary}20`,
+        }}
+      >
+        <h2 
+          className="text-lg font-semibold mb-1"
+          style={{
+            color: chlorophyTheme.colors.primary,
+            fontFamily: chlorophyTheme.fonts.display,
+          }}
+        >
+          💬 Chat con AI
+        </h2>
+        <p 
+          className="text-sm"
+          style={{ color: '#ffffff60' }}
+        >
           {hasGeneratedOnce ? 'Chiedi modifiche o crea qualcosa di nuovo' : 'Descrivi il tuo sito e l\'AI ti guiderà'}
         </p>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+      <div 
+        className="flex-1 overflow-y-auto px-6 py-4 space-y-4"
+        style={{
+          background: 'rgba(10, 14, 39, 0.5)',
+        }}
+      >
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center text-center">
             <div>
-              <div className="text-6xl mb-4">💬</div>
-              <p className="text-gray-500 text-lg">Inizia descrivendo il tuo sito web</p>
-              <p className="text-gray-400 text-sm mt-2">Esempio: "Voglio creare un sito e-commerce per sneakers streetwear"</p>
+              <motion.div
+                className="text-6xl mb-4"
+                animate={{
+                  scale: [1, 1.2, 1],
+                  rotate: [0, 10, -10, 0],
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                }}
+              >
+                💬
+              </motion.div>
+              <p 
+                className="text-lg mb-2"
+                style={{ 
+                  color: '#ffffff',
+                  fontFamily: chlorophyTheme.fonts.body,
+                }}
+              >
+                Inizia descrivendo il tuo sito web
+              </p>
+              <p 
+                className="text-sm"
+                style={{ color: '#ffffff60' }}
+              >
+                Esempio: "Voglio creare un sito e-commerce per sneakers streetwear"
+              </p>
             </div>
           </div>
         ) : (
           messages.map((msg, idx) => (
-            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <motion.div 
+              key={idx} 
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
               <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
                 msg.role === 'user' 
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white' 
-                  : 'bg-gray-100 text-gray-900'
-              }`}>
-                <p className="whitespace-pre-wrap">{msg.content}</p>
+                  ? 'text-white' 
+                  : 'text-white'
+              }`}
+              style={{
+                background: msg.role === 'user'
+                  ? chlorophyTheme.colors.gradients.primary
+                  : 'rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(10px)',
+              }}
+              >
+                <p 
+                  className="whitespace-pre-wrap"
+                  style={{
+                    fontFamily: chlorophyTheme.fonts.body,
+                  }}
+                >
+                  {msg.content}
+                </p>
                 {msg.tokensUsed && (
                   <p className="text-xs mt-2 opacity-70">Tokens: {msg.tokensUsed}</p>
                 )}
               </div>
-            </div>
+            </motion.div>
           ))
         )}
         
         {/* Progress Message */}
         {progressMessage && (
-          <div className="flex justify-center">
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 text-emerald-700 font-medium">
+          <motion.div 
+            className="flex justify-center"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
+            <div 
+              className="rounded-2xl px-4 py-3 font-medium"
+              style={{
+                background: `${chlorophyTheme.colors.primary}20`,
+                border: `1px solid ${chlorophyTheme.colors.primary}40`,
+                color: chlorophyTheme.colors.primary,
+              }}
+            >
               {progressMessage}
             </div>
-          </div>
+          </motion.div>
         )}
         
         {isGenerating && !progressMessage && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 rounded-2xl px-4 py-3">
+            <div 
+              className="rounded-2xl px-4 py-3"
+              style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+              }}
+            >
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                <motion.div 
+                  className="w-2 h-2 rounded-full"
+                  style={{ background: chlorophyTheme.colors.primary }}
+                  animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                />
+                <motion.div 
+                  className="w-2 h-2 rounded-full"
+                  style={{ background: chlorophyTheme.colors.primary }}
+                  animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
+                  transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
+                />
+                <motion.div 
+                  className="w-2 h-2 rounded-full"
+                  style={{ background: chlorophyTheme.colors.primary }}
+                  animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
+                  transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
+                />
               </div>
             </div>
           </div>
@@ -269,21 +376,46 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
       </div>
 
       {/* Input */}
-      <div className="px-6 py-4 border-t border-gray-200">
+      <div 
+        className="px-6 py-4 border-t"
+        style={{
+          background: 'rgba(26, 31, 58, 0.6)',
+          borderColor: `${chlorophyTheme.colors.primary}20`,
+        }}
+      >
         {error && (
-          <div className="mb-3 px-4 py-2 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+          <motion.div 
+            className="mb-3 px-4 py-2 rounded-lg text-sm"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              background: 'rgba(255, 71, 87, 0.2)',
+              border: '1px solid rgba(255, 71, 87, 0.4)',
+              color: '#FF4757',
+            }}
+          >
             {error}
-          </div>
+          </motion.div>
         )}
         
         {/* Generate Website Button */}
         {showGenerateButton && !isGenerating && (
-          <button
+          <motion.button
             onClick={handleGenerate}
-            className="w-full mb-3 px-6 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-bold text-lg hover:shadow-xl transition-all"
+            className="w-full mb-3 px-6 py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              background: chlorophyTheme.colors.gradients.primary,
+              color: chlorophyTheme.colors.dark,
+              boxShadow: `0 0 30px ${chlorophyTheme.colors.primary}40`,
+            }}
           >
-            🚀 Genera Sito Web
-          </button>
+            <Zap size={24} />
+            Genera Sito Web
+          </motion.button>
         )}
         
         <div className="flex gap-3">
@@ -297,17 +429,35 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
               }
             }}
             placeholder={hasGeneratedOnce ? "Scrivi le modifiche che vuoi fare..." : "Rispondi alle domande o descrivi il tuo sito... (Invio per inviare)"}
-            className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+            className="flex-1 px-4 py-3 rounded-xl focus:outline-none resize-none"
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: `1px solid ${chlorophyTheme.colors.primary}20`,
+              color: '#ffffff',
+              fontFamily: chlorophyTheme.fonts.body,
+            }}
             rows="3"
             disabled={isGenerating}
           />
-          <button
+          <motion.button
             onClick={handleChat}
             disabled={isGenerating || !prompt.trim()}
-            className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-3 rounded-xl font-semibold flex items-center gap-2"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            style={{
+              background: (isGenerating || !prompt.trim()) 
+                ? 'rgba(255, 255, 255, 0.1)' 
+                : chlorophyTheme.colors.gradients.primary,
+              color: (isGenerating || !prompt.trim())
+                ? '#ffffff60'
+                : chlorophyTheme.colors.dark,
+              cursor: (isGenerating || !prompt.trim()) ? 'not-allowed' : 'pointer',
+            }}
           >
-            {isGenerating ? '⏳' : '📤'} Invia
-          </button>
+            {isGenerating ? <Sparkles size={20} /> : <Send size={20} />}
+            Invia
+          </motion.button>
         </div>
       </div>
     </div>
