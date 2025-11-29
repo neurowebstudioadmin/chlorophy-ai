@@ -80,19 +80,6 @@ function ProtectedRoute({ children }) {
 }
 
 function App() {
-  const [userEmail, setUserEmail] = useState('francesco@chlorophy.ai');
-
-  useEffect(() => {
-    // Get user email on mount
-    authService.getCurrentUser()
-      .then(user => {
-        if (user?.email) {
-          setUserEmail(user.email);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
   return (
     <Router>
       <Routes>
@@ -105,7 +92,7 @@ function App() {
           path="/"
           element={
             <ProtectedRoute>
-              <MainLayout userEmail={userEmail} />
+              <MainLayout />
             </ProtectedRoute>
           }
         >

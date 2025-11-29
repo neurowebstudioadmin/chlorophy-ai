@@ -1,42 +1,148 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Mail, MapPin, Calendar, Upload, Save, X } from 'lucide-react';
 import { chlorophyTheme } from '../styles/chlorophy-theme';
 import toast, { Toaster } from 'react-hot-toast';
+import { authService, profileService } from '../services/supabase';
 
 export default function Profile() {
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [user, setUser] = useState(null);
   const [profile, setProfile] = useState({
-    name: 'Francesco Rossi',
-    email: 'francesco@chlorophy.ai',
-    bio: 'Web designer & AI enthusiast. Building the future of web creation.',
-    location: 'Munich, Germany',
-    joinDate: 'November 2024',
-    avatar: null,
+    name: '',
+    bio: '',
+    location: '',
+    avatar_url: null,
   });
+  const [originalProfile, setOriginalProfile] = useState({});
 
-  const handleSave = () => {
-    setIsEditing(false);
-    toast.success('Profile updated successfully!', {
-      icon: '✅',
-      style: {
-        background: chlorophyTheme.colors.dark,
-        color: chlorophyTheme.colors.primary,
-        border: `1px solid ${chlorophyTheme.colors.primary}40`,
-      },
-    });
-  };
+  // Load user and profile on mount
+  useEffect(() => {
+    loadProfile();
+  }, []);
 
-  const handleAvatarUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfile({ ...profile, avatar: reader.result });
-      };
-      reader.readAsDataURL(file);
+  const loadProfile = async () => {
+    try {
+      setLoading(true);
+      
+      // Get current user
+      const currentUser = await authService.getCurrentUser();
+      if (!currentUser) {
+        toast.error('Not authenticated');
+        return;
+      }
+      
+      setUser(currentUser);
+      
+      // Get profile from database
+      const userProfile = await profileService.getProfile(currentUser.id);
+      
+      if (userProfile) {
+        setProfile(userProfile);
+        setOriginalProfile(userProfile);
+      } else {
+        // No profile yet, set defaults
+        const defaultProfile = {
+          name: currentUser.email?.split('@')[0] || '',
+          bio: '',
+          location: '',
+          avatar_url: null,
+        };
+        setProfile(defaultProfile);
+        setOriginalProfile(defaultProfile);
+      }
+    } catch (err) {
+      console.error('Error loading profile:', err);
+      toast.error('Error loading profile');
+    } finally {
+      setLoading(false);
     }
   };
+
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image too large! Max 2MB');
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file');
+      return;
+    }
+
+    try {
+      toast.loading('Uploading avatar...');
+      
+      // Upload to Supabase Storage
+      const avatarUrl = await profileService.uploadAvatar(user.id, file);
+      
+      // Update profile with new avatar URL
+      setProfile({ ...profile, avatar_url: avatarUrl });
+      
+      toast.dismiss();
+      toast.success('Avatar uploaded!');
+    } catch (err) {
+      console.error('Error uploading avatar:', err);
+      toast.dismiss();
+      toast.error('Failed to upload avatar');
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      
+      // Save to database
+      await profileService.upsertProfile(user.id, {
+        name: profile.name,
+        bio: profile.bio,
+        location: profile.location,
+        avatar_url: profile.avatar_url,
+      });
+      
+      setOriginalProfile(profile);
+      setIsEditing(false);
+      
+      toast.success('Profile updated successfully!', {
+        icon: '✅',
+        style: {
+          background: chlorophyTheme.colors.dark,
+          color: chlorophyTheme.colors.primary,
+          border: `1px solid ${chlorophyTheme.colors.primary}40`,
+        },
+      });
+    } catch (err) {
+      console.error('Error saving profile:', err);
+      toast.error('Failed to save profile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setProfile(originalProfile);
+    setIsEditing(false);
+  };
+
+  if (loading) {
+    return (
+      <div className="p-8 flex items-center justify-center h-full">
+        <div className="text-white text-xl">Loading profile...</div>
+      </div>
+    );
+  }
+
+  // Format join date
+  const joinDate = user?.created_at 
+    ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    : 'Unknown';
 
   return (
     <div className="p-8 max-w-[1200px] mx-auto">
@@ -82,12 +188,12 @@ export default function Profile() {
         }}
       >
         {/* Cover Image */}
-        <div 
-          className="h-32 relative"
-          style={{
-            background: chlorophyTheme.colors.gradients.primary,
-          }}
-        >
+          <div 
+        className="h-24 relative"
+         style={{
+         background: chlorophyTheme.colors.gradients.primary,
+        }}
+      >
           {/* Edit Button */}
           <div className="absolute top-4 right-4">
             {!isEditing ? (
@@ -108,19 +214,22 @@ export default function Profile() {
               <div className="flex gap-2">
                 <motion.button
                   onClick={handleSave}
+                  disabled={saving}
                   className="px-4 py-2 rounded-lg backdrop-blur-xl font-medium flex items-center gap-2"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                  whileHover={{ scale: saving ? 1 : 1.05 }}
+                  whileTap={{ scale: saving ? 1 : 0.95 }}
                   style={{
-                    background: chlorophyTheme.colors.primary,
-                    color: chlorophyTheme.colors.dark,
+                    background: saving ? 'rgba(255, 255, 255, 0.1)' : chlorophyTheme.colors.primary,
+                    color: saving ? '#ffffff60' : chlorophyTheme.colors.dark,
+                    cursor: saving ? 'not-allowed' : 'pointer',
                   }}
                 >
                   <Save size={16} />
-                  Save
+                  {saving ? 'Saving...' : 'Save'}
                 </motion.button>
                 <motion.button
-                  onClick={() => setIsEditing(false)}
+                  onClick={handleCancel}
+                  disabled={saving}
                   className="px-4 py-2 rounded-lg backdrop-blur-xl font-medium flex items-center gap-2"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -140,19 +249,19 @@ export default function Profile() {
 
         {/* Avatar & Basic Info */}
         <div className="px-8 pb-8">
-          <div className="flex items-end gap-6 -mt-16 mb-6">
+          <div className="flex items-end gap-6 -mt-12 mb-6">
             {/* Avatar */}
             <div className="relative">
               <div 
-                className="w-32 h-32 rounded-2xl flex items-center justify-center border-4"
+                className="w-32 h-32 rounded-2xl flex items-center justify-center border-4 overflow-hidden"
                 style={{
-                  background: profile.avatar 
-                    ? `url(${profile.avatar}) center/cover`
+                  background: profile.avatar_url 
+                    ? `url(${profile.avatar_url}) center/cover`
                     : chlorophyTheme.colors.gradients.primary,
                   borderColor: chlorophyTheme.colors.dark,
                 }}
               >
-                {!profile.avatar && (
+                {!profile.avatar_url && (
                   <User size={48} style={{ color: chlorophyTheme.colors.dark }} />
                 )}
               </div>
@@ -186,6 +295,7 @@ export default function Profile() {
                   type="text"
                   value={profile.name}
                   onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                  placeholder="Your name"
                   className="text-3xl font-bold mb-2 w-full px-4 py-2 rounded-lg"
                   style={{
                     background: 'rgba(255, 255, 255, 0.05)',
@@ -202,7 +312,7 @@ export default function Profile() {
                     fontFamily: chlorophyTheme.fonts.display,
                   }}
                 >
-                  {profile.name}
+                  {profile.name || 'No name set'}
                 </h2>
               )}
               <p 
@@ -210,7 +320,7 @@ export default function Profile() {
                 style={{ color: '#ffffff60' }}
               >
                 <Mail size={18} />
-                {profile.email}
+                {user?.email}
               </p>
             </div>
           </div>
@@ -229,6 +339,7 @@ export default function Profile() {
                 <textarea
                   value={profile.bio}
                   onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+                  placeholder="Tell us about yourself..."
                   rows={4}
                   className="w-full px-4 py-3 rounded-lg"
                   style={{
@@ -244,7 +355,7 @@ export default function Profile() {
                   className="text-sm"
                   style={{ color: '#ffffff' }}
                 >
-                  {profile.bio}
+                  {profile.bio || 'No bio yet'}
                 </p>
               )}
             </div>
@@ -263,6 +374,7 @@ export default function Profile() {
                     type="text"
                     value={profile.location}
                     onChange={(e) => setProfile({ ...profile, location: e.target.value })}
+                    placeholder="City, Country"
                     className="w-full px-4 py-2 rounded-lg"
                     style={{
                       background: 'rgba(255, 255, 255, 0.05)',
@@ -277,7 +389,7 @@ export default function Profile() {
                     style={{ color: '#ffffff' }}
                   >
                     <MapPin size={16} style={{ color: chlorophyTheme.colors.primary }} />
-                    {profile.location}
+                    {profile.location || 'No location set'}
                   </p>
                 )}
               </div>
@@ -294,7 +406,7 @@ export default function Profile() {
                   style={{ color: '#ffffff' }}
                 >
                   <Calendar size={16} style={{ color: chlorophyTheme.colors.accent }} />
-                  {profile.joinDate}
+                  {joinDate}
                 </p>
               </div>
             </div>

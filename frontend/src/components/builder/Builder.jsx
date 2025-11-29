@@ -415,10 +415,11 @@ export default function Builder() {
         </div>
       </div>
 
-      {/* AI Insight Panel - Floating */}
+      {/* AI Insight Panel - Floating - SEMPRE VISIBILE quando c'è codice */}
       <AIInsightPanel 
         generatedCode={generatedCode}
-        isVisible={generatedCode && activeTab !== 'chat'}
+        isVisible={!!generatedCode}
+        onCodeImproved={setGeneratedCode}
       />
     </div>
   );
