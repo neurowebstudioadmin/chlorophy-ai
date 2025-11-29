@@ -360,4 +360,160 @@ router.post('/generate-project', async (req, res) => {
   }
 });
 
+// POST /api/ai/analyze - ANALIZZA CODICE PER AI INSIGHTS
+router.post('/analyze', async (req, res) => {
+  try {
+    const { code } = req.body;
+
+    if (!code) {
+      return res.status(400).json({
+        success: false,
+        error: 'Code is required'
+      });
+    }
+
+    console.log('🔍 Analyzing code for AI Insights...');
+
+    const analysisPrompt = `Analyze this website code and provide actionable insights in the following categories:
+
+1. Performance Optimization
+2. SEO Improvements  
+3. Accessibility Issues
+4. Design Suggestions
+5. Mobile Optimization
+
+Code to analyze:
+\`\`\`html
+${code}
+\`\`\`
+
+CRITICAL: Respond ONLY with valid JSON in this exact format, no other text, no markdown:
+{
+  "overallScore": <number 0-100>,
+  "insights": [
+    {
+      "type": "optimization|seo|accessibility|design|mobile",
+      "title": "<short title max 3 words>",
+      "message": "<detailed actionable suggestion>",
+      "priority": "high|medium|low|info"
+    }
+  ]
+}
+
+Provide 4-6 insights total. Be specific and actionable. Focus on REAL issues found in the code.`;
+
+    const analysisMessages = [
+      {
+        role: 'user',
+        content: analysisPrompt
+      }
+    ];
+
+    const result = await claudeService.chat(analysisMessages);
+
+    if (result.success) {
+      // Parse JSON response
+      let responseText = result.response;
+      
+      // Strip markdown if present
+      responseText = responseText
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim();
+
+      const analysis = JSON.parse(responseText);
+
+      console.log('✅ Analysis complete! Score:', analysis.overallScore);
+      
+      return res.json({
+        success: true,
+        analysis: analysis,
+        tokensUsed: result.tokensUsed
+      });
+    } else {
+      console.error('❌ Analysis failed:', result.error);
+      return res.status(500).json({
+        success: false,
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error('❌ Analysis error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to analyze code: ' + error.message
+    });
+  }
+});
+
+// POST /api/ai/apply-suggestions - APPLICA SUGGERIMENTI AI INSIGHTS
+router.post('/apply-suggestions', async (req, res) => {
+  try {
+    const { code, suggestions } = req.body;
+
+    if (!code || !suggestions) {
+      return res.status(400).json({
+        success: false,
+        error: 'Code and suggestions are required'
+      });
+    }
+
+    console.log('🔧 Applying AI suggestions to code...');
+
+    const improvementPrompt = `You are a code improvement expert. Apply these suggestions to improve the website code:
+
+SUGGESTIONS TO APPLY:
+${suggestions}
+
+CURRENT CODE:
+\`\`\`html
+${code}
+\`\`\`
+
+TASK: Apply ALL the suggestions listed above to improve the code. Make the changes directly in the code.
+
+CRITICAL RULES:
+- Output ONLY the improved HTML code
+- Start with <!DOCTYPE html>
+- NO explanatory text before or after
+- NO markdown code blocks
+- Apply ALL suggestions completely
+- Keep all existing functionality
+- Improve code quality based on suggestions
+
+Output the complete improved code now:`;
+
+    const improvementMessages = [
+      {
+        role: 'user',
+        content: improvementPrompt
+      }
+    ];
+
+    const result = await claudeService.generateWebsite(improvementMessages);
+
+    if (result.success) {
+      console.log('✅ Code improved successfully!');
+      console.log('🎯 Tokens used:', result.tokensUsed);
+      
+      return res.json({
+        success: true,
+        improvedCode: result.code,
+        tokensUsed: result.tokensUsed
+      });
+    } else {
+      console.error('❌ Improvement failed:', result.error);
+      return res.status(500).json({
+        success: false,
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error('❌ Apply suggestions error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to apply suggestions: ' + error.message
+    });
+  }
+});
 export default router;
