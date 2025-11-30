@@ -1,11 +1,11 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import dotenv from 'dotenv';
 import aiRoutes from './routes/ai.js';
 
-// Solo in locale usa .env file, in produzione usa env variables
+// Dotenv solo in sviluppo locale
 if (process.env.NODE_ENV !== 'production') {
+  const dotenv = await import('dotenv');
   dotenv.config();
 }
 
