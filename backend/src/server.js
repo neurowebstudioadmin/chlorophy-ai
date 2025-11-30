@@ -4,7 +4,10 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import aiRoutes from './routes/ai.js';
 
-dotenv.config();
+// Solo in locale usa .env file, in produzione usa env variables
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config();
+}
 
 const app = express();
 const PORT = process.env.PORT || 3001;
