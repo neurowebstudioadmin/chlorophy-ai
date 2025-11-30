@@ -8,6 +8,7 @@ import Billing from './pages/Billing';
 import Builder from './components/builder/Builder';
 import LoginForm from './components/auth/LoginForm';
 import SignupForm from './components/auth/SignupForm';
+import ComingSoon from './components/ComingSoon';
 import { authService } from './services/supabase';
 
 // Placeholder pages
@@ -80,13 +81,20 @@ function ProtectedRoute({ children }) {
 }
 
 function App() {
+  // Check if site is unlocked
+  const isUnlocked = localStorage.getItem('chlorophy_unlocked') === 'true';
+  
+  if (!isUnlocked) {
+    return <ComingSoon />;
+  }
+
   return (
     <Router>
       <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<LoginForm />} />
         <Route path="/signup" element={<SignupForm />} />
-
+        
         {/* Protected Routes */}
         <Route
           path="/"
@@ -106,7 +114,7 @@ function App() {
           <Route path="settings" element={<Settings />} />
           <Route path="profile" element={<Profile />} />
         </Route>
-
+        
         {/* Catch all */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
