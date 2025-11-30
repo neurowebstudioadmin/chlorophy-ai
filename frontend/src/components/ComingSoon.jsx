@@ -27,9 +27,9 @@ export default function ComingSoon() {
 
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 mb-8">
           <p className="text-gray-700 mb-6">
-            Il futuro della creazione di siti web con AI sta arrivando. <br/>
-            Registrati per essere tra i primi ad accedere!
-          </p>
+            The future of AI-powered website creation is coming soon. <br/>
+             Something amazing is in the works!
+            </p>
           
           <form onSubmit={handleSubmit} className="max-w-md mx-auto">
             <input
@@ -48,7 +48,7 @@ export default function ComingSoon() {
           </form>
         </div>
 
-        <p className="text-gray-500 text-sm">© 2025 Chlorophy AI - Munich, Germany</p>
+        <p className="text-gray-500 text-sm">© 2025 Chlorophy AI. All rights reserved.</p>
       </div>
     </div>
   );
