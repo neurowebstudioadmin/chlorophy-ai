@@ -42,7 +42,6 @@ function ProtectedRoute({ children }) {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // Check current user
     authService.getCurrentUser()
       .then(user => {
         setUser(user);
@@ -53,7 +52,6 @@ function ProtectedRoute({ children }) {
         setLoading(false);
       });
 
-    // Listen for auth changes
     const { data: { subscription } } = authService.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         setUser(null);
@@ -81,11 +79,16 @@ function ProtectedRoute({ children }) {
 }
 
 function App() {
-  // Check if site is unlocked
-  const isUnlocked = localStorage.getItem('chlorophy_unlocked') === 'true';
-  
+  const [isUnlocked, setIsUnlocked] = useState(false);
+
+  useEffect(() => {
+    const unlocked = localStorage.getItem('chlorophy_unlocked') === 'true';
+    setIsUnlocked(unlocked);
+  }, []);
+
+  // If not unlocked, show Coming Soon for everything
   if (!isUnlocked) {
-    return <ComingSoon />;
+    return <ComingSoon onUnlock={() => setIsUnlocked(true)} />;
   }
 
   return (

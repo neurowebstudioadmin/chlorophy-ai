@@ -1,16 +1,16 @@
 import { useState } from 'react';
 
-export default function ComingSoon() {
+export default function ComingSoon({ onUnlock }) {
   const [password, setPassword] = useState('');
-  const [isUnlocked, setIsUnlocked] = useState(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     // Password segreta per te
     if (password === 'chlorophy2025') {
-      setIsUnlocked(true);
       localStorage.setItem('chlorophy_unlocked', 'true');
-      window.location.reload();
+      if (onUnlock) {
+        onUnlock();
+      }
     } else {
       alert('Password non corretta');
     }
@@ -28,8 +28,8 @@ export default function ComingSoon() {
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 mb-8">
           <p className="text-gray-700 mb-6">
             The future of AI-powered website creation is coming soon. <br/>
-             Something amazing is in the works!
-            </p>
+            Something amazing is in the works!
+          </p>
           
           <form onSubmit={handleSubmit} className="max-w-md mx-auto">
             <input

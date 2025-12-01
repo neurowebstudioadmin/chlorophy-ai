@@ -40,24 +40,16 @@ export default function Sidebar({ isCollapsed, setIsCollapsed, userEmail = 'user
   if (id === 'logout') {
     if (window.confirm('Are you sure you want to logout?')) {
       try {
-        // Importa authService
         const { authService } = await import('../../services/supabase');
-        
-        // Supabase logout
         await authService.signOut();
-        
-        // Pulisci storage
         localStorage.clear();
         sessionStorage.clear();
-        
-        // Force redirect
-        window.location.replace('/login');
+        window.location.href = '/login';
       } catch (err) {
         console.error('Logout error:', err);
-        // Anche in caso di errore, redirect
         localStorage.clear();
         sessionStorage.clear();
-        window.location.replace('/login');
+        window.location.href = '/login';
       }
     }
   } else {
