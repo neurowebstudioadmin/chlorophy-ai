@@ -139,7 +139,7 @@ export default function AIInsightPanel({ generatedCode, isVisible = true, onCode
       setIsAnalyzing(true);
       setCurrentInsights([]);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/apply-suggestions`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/analyze`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -178,7 +178,7 @@ export default function AIInsightPanel({ generatedCode, isVisible = true, onCode
         .map((insight, i) => `${i + 1}. ${insight.title}: ${insight.message}`)
         .join('\n');
 
-      const response = await fetch('http://localhost:3001/api/ai/apply-suggestions', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/apply-suggestions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
