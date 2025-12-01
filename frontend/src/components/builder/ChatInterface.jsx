@@ -66,9 +66,15 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
         const updatedHistory = [...newHistory, { role: 'assistant', content: data.response }];
         setConversationHistory(updatedHistory);
         
-        if (updatedHistory.length >= 4 && !hasGeneratedOnce) {
-          setShowGenerateButton(true);
-        }
+        // LOGICA: Mostra bottone solo se pre-processed (risposta contiene "Genera Sito Web") 
+        // OPPURE dopo conversazione lunga (4+ messaggi)
+        const isPreProcessedResponse = data.response.includes('Genera Sito Web') || 
+                               data.response.includes('Generate Website') ||
+                               data.response.includes('Generar Sitio Web');
+
+        if (isPreProcessedResponse || (updatedHistory.length >= 4 && !hasGeneratedOnce)) {
+        setShowGenerateButton(true);
+         }
       } else {
         setError(data.error || 'Errore nella conversazione');
       }
@@ -102,7 +108,7 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
     try {
       console.log('🔧 Sending refine request with previousCode length:', generatedCode?.length);
       
-      const response = await fetch('http://localhost:3001/api/ai/refine', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/refine`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -167,7 +173,7 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
     }, 2000);
 
     try {
-      const response = await fetch('http://localhost:3001/api/ai/generate-project', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/generate-project`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: conversationHistory })
