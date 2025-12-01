@@ -51,7 +51,7 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
     }
 
     try {
-      const response = await fetch('http://localhost:3001/api/ai/chat', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: newHistory })
