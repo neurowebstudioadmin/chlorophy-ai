@@ -18,7 +18,47 @@ router.post('/chat', async (req, res) => {
 
     console.log('💬 Chat request with', messages.length, 'messages');
 
-    // PROMPT ULTRA RINFORZATO - SOLO CONVERSAZIONE
+    // STEP 1: CHECK FOR SIMPLE REQUESTS (pre-processing)
+    const lastMessage = messages[messages.length - 1];
+    const userRequest = lastMessage.content.toLowerCase();
+
+    const simpleKeywords = [
+      'coming soon',
+      'landing page',
+      'portfolio',
+      'contact page',
+      '404 page',
+      'thank you page',
+      'under construction'
+    ];
+
+    const isSimpleRequest = simpleKeywords.some(keyword => userRequest.includes(keyword));
+
+    // If simple request, respond immediately without calling Claude
+    if (isSimpleRequest && messages.length === 1) {
+      console.log('⚡ Simple request detected - fast response');
+      
+      // Detect language
+      const isItalian = /creami|crea|fai|vorrei|pagina/i.test(userRequest);
+      const isSpanish = /crear|hacer|página/i.test(userRequest);
+      
+      let response;
+      if (isItalian) {
+        response = "Perfetto! Creerò una bellissima pagina per te. Premi 'Genera Sito Web' quando sei pronto! 🚀";
+      } else if (isSpanish) {
+        response = "¡Perfecto! Crearé una hermosa página para ti. ¡Presiona 'Generar Sitio Web' cuando estés listo! 🚀";
+      } else {
+        response = "Perfect! I'll create a beautiful page for you. Click 'Generate Website' when you're ready! 🚀";
+      }
+
+      return res.json({
+        success: true,
+        response: response,
+        tokensUsed: 0 // No Claude API call
+      });
+    }
+
+    // STEP 2: For complex requests, call Claude normally
     const chatSystemPrompt = `${SYSTEM_PROMPT}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -33,20 +73,20 @@ ABSOLUTE RULES FOR THIS MODE:
 ❌ DO NOT create design concepts with code
 
 ✅ ONLY have natural conversation in the user's language
-✅ ONLY ask questions to understand requirements
+✅ ONLY ask 2-3 relevant questions to understand requirements
 ✅ ONLY discuss ideas, preferences, and features in plain text
 ✅ Be friendly, professional, and enthusiastic
+✅ Keep it SHORT and conversational
 
 YOUR TASK:
 1. Understand what website the user wants
-2. Ask clarifying questions (3-4 questions)
-3. Gather information: colors, style, features, content
+2. Ask 2-3 clarifying questions MAXIMUM
+3. Gather information: colors, style, key features
 4. Respond ONLY with conversational text
 5. After gathering enough info, confirm understanding and tell user you're ready when they press the generate button
 
 REMEMBER: This is pure conversation - code generation happens in a separate step later!`;
 
-    // Prepara i messaggi con il system prompt
     const conversationMessages = [
       {
         role: 'user',
@@ -516,4 +556,5 @@ Output the complete improved code now:`;
     });
   }
 });
+
 export default router;
