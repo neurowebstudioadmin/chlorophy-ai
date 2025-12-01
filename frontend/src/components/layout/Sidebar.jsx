@@ -44,12 +44,12 @@ export default function Sidebar({ isCollapsed, setIsCollapsed, userEmail = 'user
         await authService.signOut();
         localStorage.clear();
         sessionStorage.clear();
-        window.location.href = '/login';
+        window.location.href = '/';
       } catch (err) {
         console.error('Logout error:', err);
         localStorage.clear();
         sessionStorage.clear();
-        window.location.href = '/login';
+        window.location.href = '/';
       }
     }
   } else {
