@@ -139,7 +139,7 @@ export default function AIInsightPanel({ generatedCode, isVisible = true, onCode
       setIsAnalyzing(true);
       setCurrentInsights([]);
 
-      const response = await fetch('http://localhost:3001/api/ai/analyze', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/apply-suggestions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
