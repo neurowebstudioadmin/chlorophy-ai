@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, Eye, Code2, Globe, Rocket, Sparkles } from 'lucide-react';
+import { Sparkles, Eye, Code2, Dna, Rocket } from 'lucide-react';
 import { chlorophyTheme } from '../../styles/chlorophy-theme';
 
 const tabs = [
   { 
-    id: 'chat', 
-    label: 'Chat', 
-    icon: MessageSquare, 
-    color: chlorophyTheme.colors.primary,
-    description: 'Talk with AI'
+    id: 'streaming', 
+    label: 'Live Streaming', 
+    icon: Sparkles, 
+    color: '#10B981',
+    description: 'Watch AI write code'
   },
   { 
     id: 'preview', 
@@ -26,11 +26,11 @@ const tabs = [
     description: 'View files'
   },
   { 
-    id: 'galaxy', 
-    label: 'Galaxy', 
-    icon: Globe, 
-    color: '#FF6B9D',
-    description: '3D visualization'
+    id: 'dna', 
+    label: 'Website DNA', 
+    icon: Dna, 
+    color: '#8B5CF6',
+    description: 'Quality & Certificate'
   },
   { 
     id: 'deploy', 
@@ -107,13 +107,27 @@ export default function TabPortalSystem({ activeTab, onTabChange }) {
               />
             )}
 
-            {/* Icon */}
+            {/* Icon with Special Animations */}
             <motion.div
               className="relative flex items-center justify-center mb-1"
-              animate={{
-                rotate: isHovered ? [0, -10, 10, -10, 0] : 0,
+              animate={
+                tab.id === 'streaming' && isActive
+                  ? {
+                      scale: [1, 1.1, 1],
+                    }
+                  : tab.id === 'dna' && isActive
+                  ? {
+                      rotate: [0, 360],
+                    }
+                  : isHovered
+                  ? { rotate: [0, -10, 10, -10, 0] }
+                  : {}
+              }
+              transition={{ 
+                duration: tab.id === 'streaming' && isActive ? 2 : tab.id === 'dna' && isActive ? 3 : 0.5,
+                repeat: (tab.id === 'streaming' || tab.id === 'dna') && isActive ? Infinity : 0,
+                ease: tab.id === 'dna' && isActive ? 'linear' : 'easeInOut',
               }}
-              transition={{ duration: 0.5 }}
             >
               <Icon 
                 size={24} 
@@ -124,8 +138,94 @@ export default function TabPortalSystem({ activeTab, onTabChange }) {
                 }}
               />
               
-              {/* Sparkle effect on hover */}
-              {isHovered && (
+              {/* LIVE Badge for Live Streaming when active */}
+              {tab.id === 'streaming' && isActive && (
+                <motion.div
+                  className="absolute -top-2 -right-2 px-1.5 py-0.5 rounded text-[8px] font-black"
+                  style={{
+                    background: tab.color,
+                    color: '#000',
+                  }}
+                  animate={{
+                    scale: [1, 1.1, 1],
+                  }}
+                  transition={{
+                    duration: 1.5,
+                    repeat: Infinity,
+                  }}
+                >
+                  LIVE
+                </motion.div>
+              )}
+              
+              {/* Extra sparkles for Live Streaming when active */}
+              {tab.id === 'streaming' && isActive && (
+                <>
+                  <motion.div
+                    className="absolute"
+                    style={{ top: -8, right: -8 }}
+                    animate={{
+                      scale: [0, 1, 0],
+                      rotate: [0, 180, 360],
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      delay: 0,
+                    }}
+                  >
+                    <Sparkles size={12} style={{ color: tab.color }} />
+                  </motion.div>
+                  <motion.div
+                    className="absolute"
+                    style={{ bottom: -8, left: -8 }}
+                    animate={{
+                      scale: [0, 1, 0],
+                      rotate: [360, 180, 0],
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      delay: 1,
+                    }}
+                  >
+                    <Sparkles size={12} style={{ color: tab.color }} />
+                  </motion.div>
+                </>
+              )}
+
+              {/* Orbiting effect for DNA when active */}
+              {tab.id === 'dna' && isActive && (
+                <>
+                  <motion.div
+                    className="absolute w-8 h-8 border border-current rounded-full"
+                    style={{ color: `${tab.color}40` }}
+                    animate={{
+                      rotate: 360,
+                      scale: [1, 1.2, 1],
+                    }}
+                    transition={{
+                      rotate: { duration: 4, repeat: Infinity, ease: 'linear' },
+                      scale: { duration: 2, repeat: Infinity },
+                    }}
+                  />
+                  <motion.div
+                    className="absolute w-6 h-6 border border-current rounded-full"
+                    style={{ color: `${tab.color}60` }}
+                    animate={{
+                      rotate: -360,
+                      scale: [1.2, 1, 1.2],
+                    }}
+                    transition={{
+                      rotate: { duration: 3, repeat: Infinity, ease: 'linear' },
+                      scale: { duration: 2, repeat: Infinity, delay: 0.5 },
+                    }}
+                  />
+                </>
+              )}
+              
+              {/* Sparkle effect on hover for other tabs */}
+              {isHovered && tab.id !== 'streaming' && tab.id !== 'dna' && (
                 <motion.div
                   className="absolute"
                   initial={{ scale: 0, rotate: 0 }}
@@ -148,7 +248,7 @@ export default function TabPortalSystem({ activeTab, onTabChange }) {
               {tab.label}
             </span>
 
-            {/* Hover Tooltip - FIXED z-index */}
+            {/* Hover Tooltip */}
             <AnimatePresence>
               {isHovered && !isActive && (
                 <motion.div

@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import Billing from './pages/Billing';
+import MyProjects from './pages/MyProjects';
 import Builder from './components/builder/Builder';
 import LoginForm from './components/auth/LoginForm';
 import SignupForm from './components/auth/SignupForm';
@@ -12,14 +13,6 @@ import ComingSoon from './components/ComingSoon';
 import { authService } from './services/supabase';
 
 // Placeholder pages
-function Projects() {
-  return (
-    <div className="p-8">
-      <h1 className="text-4xl font-bold text-white">My Projects - Coming Soon</h1>
-    </div>
-  );
-}
-
 function Templates() {
   return (
     <div className="p-8">
@@ -110,7 +103,7 @@ function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="builder" element={<Builder />} />
-          <Route path="projects" element={<Projects />} />
+          <Route path="projects" element={<MyProjects />} />
           <Route path="templates" element={<Templates />} />
           <Route path="stats" element={<Stats />} />
           <Route path="billing" element={<Billing />} />

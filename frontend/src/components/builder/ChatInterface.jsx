@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Sparkles, Zap } from 'lucide-react';
+import { Send, Sparkles, Zap, AlertCircle, CreditCard } from 'lucide-react';
 import { chlorophyTheme } from '../../styles/chlorophy-theme';
+import { supabase, projectsService } from '../../services/supabase';
 
-export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGenerating, generatedCode }) {
+export default function ChatInterface({ onCodeGenerated, onGenerationStart, isGenerating, setIsGenerating, generatedCode, onCreditsUpdate }) {
   const [prompt, setPrompt] = useState('');
   const [messages, setMessages] = useState([]);
   const [error, setError] = useState('');
@@ -11,6 +12,20 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
   const [showGenerateButton, setShowGenerateButton] = useState(false);
   const [progressMessage, setProgressMessage] = useState('');
   const [hasGeneratedOnce, setHasGeneratedOnce] = useState(false);
+  const [userId, setUserId] = useState(null);
+  const [showUpgradeAlert, setShowUpgradeAlert] = useState(false);
+  const [creditsNeeded, setCreditsNeeded] = useState(0);
+
+  // Get user ID on mount
+  useEffect(() => {
+    const getUserId = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+      }
+    };
+    getUserId();
+  }, []);
 
   // Parole chiave per riconoscere richieste di correzione
   const isRefinementRequest = (text) => {
@@ -24,7 +39,7 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
     return keywords.some(keyword => lowerText.includes(keyword));
   };
 
-  // Chat con Claude (fa domande)
+  // Chat con AI (fa domande)
   const handleChat = async () => {
     if (!prompt.trim()) {
       setError('Per favore, descrivi cosa vuoi creare o modificare');
@@ -32,6 +47,7 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
     }
 
     setError('');
+    setShowUpgradeAlert(false);
     
     const userMessage = { role: 'user', content: prompt };
     setMessages(prev => [...prev, userMessage]);
@@ -66,15 +82,14 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
         const updatedHistory = [...newHistory, { role: 'assistant', content: data.response }];
         setConversationHistory(updatedHistory);
         
-        // LOGICA: Mostra bottone solo se pre-processed (risposta contiene "Genera Sito Web") 
-        // OPPURE dopo conversazione lunga (4+ messaggi)
+        // Mostra bottone se risposta contiene "Genera" o dopo 4+ messaggi
         const isPreProcessedResponse = data.response.includes('Genera Sito Web') || 
                                data.response.includes('Generate Website') ||
                                data.response.includes('Generar Sitio Web');
 
         if (isPreProcessedResponse || (updatedHistory.length >= 4 && !hasGeneratedOnce)) {
-        setShowGenerateButton(true);
-         }
+          setShowGenerateButton(true);
+        }
       } else {
         setError(data.error || 'Errore nella conversazione');
       }
@@ -86,9 +101,22 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
     }
   };
 
-  // Refine (correzioni immediate) - OTTIMIZZATO
+  // Refine (correzioni immediate)
   const handleRefine = async (history, userRequest) => {
+    if (!userId) {
+      setError('Per favore effettua il login per continuare');
+      setIsGenerating(false);
+      return;
+    }
+
     setShowGenerateButton(false);
+    setShowUpgradeAlert(false);
+    
+    // 🎯 SWITCH TO STREAMING IMMEDIATELY!
+    if (onGenerationStart) {
+      onGenerationStart(true); // true = modification
+    }
+    
     setProgressMessage('⚡ Sto applicando la modifica...');
 
     const progressMessages = [
@@ -106,33 +134,54 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
     }, 1500);
 
     try {
-      console.log('🔧 Sending refine request with previousCode length:', generatedCode?.length);
+      console.log('🔧 Sending refine request with userId:', userId);
       
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/refine`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           messages: history,
-          previousCode: generatedCode
+          previousCode: generatedCode,
+          userId: userId
         })
       });
 
       const data = await response.json();
       clearInterval(progressInterval);
 
+      // Handle insufficient credits
+      if (response.status === 402) {
+        setProgressMessage('');
+        setShowUpgradeAlert(true);
+        setCreditsNeeded(data.creditsNeeded || 1);
+        
+        const errorMsg = { 
+          role: 'assistant', 
+          content: `⚠️ Crediti insufficienti! Hai ${data.creditsAvailable || 0} crediti, ma servono ${data.creditsNeeded || 1} per questa modifica.`,
+        };
+        setMessages(prev => [...prev, errorMsg]);
+        return;
+      }
+
       if (data.success) {
         setProgressMessage('✅ Modifica applicata!');
         
-        console.log('✅ Refine completed. Change percentage:', data.changePercentage + '%');
+        console.log('✅ Refine completed. Change:', data.changePercentage + '%');
+        console.log('💳 Credits used:', data.creditsUsed, '| Remaining:', data.creditsRemaining);
+        
+        // Update credits in parent
+        if (onCreditsUpdate && data.creditsRemaining !== undefined) {
+          onCreditsUpdate(data.creditsRemaining);
+        }
         
         const successMsg = { 
           role: 'assistant', 
-          content: `✅ Fatto! Ho modificato il codice (${data.changePercentage || '~'}% cambiato). Guarda il risultato!`,
+          content: `✅ Fatto! Ho modificato il codice (~${data.changePercentage || '10'}% cambiato). ${data.creditsUsed ? `Crediti usati: ${data.creditsUsed}` : ''}`,
           tokensUsed: data.tokensUsed
         };
         setMessages(prev => [...prev, successMsg]);
         
-        onCodeGenerated(data.code);
+        onCodeGenerated(data.code, true);
         
         setTimeout(() => setProgressMessage(''), 2000);
       } else {
@@ -149,18 +198,29 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
     }
   };
 
-  // Genera il website - MOSTRA PREVIEW + SALVA ZIP
+  // Genera il website
   const handleGenerate = async () => {
+    if (!userId) {
+      setError('Per favore effettua il login per generare un sito');
+      return;
+    }
+
     setIsGenerating(true);
     setShowGenerateButton(false);
-    setProgressMessage('✨ Perfetto! Sto lavorando al tuo progetto...');
+    setShowUpgradeAlert(false);
+    
+    // 🎯 SWITCH TO STREAMING IMMEDIATELY!
+    if (onGenerationStart) {
+      onGenerationStart(false); // false = new generation
+    }
+    
+    setProgressMessage('✨ Perfetto! Sto generando il tuo sito...');
 
     const progressMessages = [
-      '✨ Perfetto! Sto lavorando al tuo progetto...',
-      '🎨 Sto creando il design su misura per te...',
-      '⚙️ Generando file HTML, CSS, JS...',
-      '📁 Organizzando la struttura del progetto...',
-      '📦 Creando il file ZIP...',
+      '✨ Perfetto! Sto generando il tuo sito...',
+      '🎨 Creando la struttura HTML...',
+      '💅 Applicando CSS e design...',
+      '⚙️ Aggiungendo JavaScript e interattività...',
       '🚀 Quasi pronto! Ultimi ritocchi...'
     ];
 
@@ -170,35 +230,77 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
       if (progressIndex < progressMessages.length) {
         setProgressMessage(progressMessages[progressIndex]);
       }
-    }, 2000);
+    }, 3000);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/generate-project`, {
+      console.log('🚀 Sending generate request with userId:', userId);
+      
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: conversationHistory })
+        body: JSON.stringify({ 
+          messages: conversationHistory,
+          userId: userId
+        })
       });
 
       const data = await response.json();
       clearInterval(progressInterval);
 
-      if (data.success) {
-        setProgressMessage('✅ Progetto generato con successo!');
+      // Handle insufficient credits (402 status)
+      if (response.status === 402) {
+        setProgressMessage('');
+        setShowUpgradeAlert(true);
+        setCreditsNeeded(data.creditsNeeded || 1);
         
-        // Salva ZIP per download successivo
-        window.chlorophyZipData = {
-          zipData: data.zipData,
-          projectName: data.projectName
+        const errorMsg = { 
+          role: 'assistant', 
+          content: `⚠️ Crediti insufficienti! Hai ${data.creditsAvailable || 0} crediti, ma servono ${data.creditsNeeded || 1} per generare questo sito. ${data.upgradePrompt || 'Aggiorna il tuo piano!'}`,
         };
+        setMessages(prev => [...prev, errorMsg]);
+        setIsGenerating(false);
+        return;
+      }
+
+      if (data.success) {
+        setProgressMessage('✅ Sito generato con successo!');
         
-        // Mostra preview
-        onCodeGenerated(data.previewHTML);
+        console.log('✅ Generation completed!');
+        console.log('🎯 Steps:', data.generation?.steps_completed, '/', data.generation?.total_steps);
+        console.log('💳 Credits used:', data.credits?.used, '| Remaining:', data.credits?.remaining);
+        console.log('⏱️ Duration:', data.generation?.duration_seconds, 's');
+        
+        // Update credits in parent
+        if (onCreditsUpdate && data.credits?.remaining !== undefined) {
+          onCreditsUpdate(data.credits.remaining);
+        }
+        
+        // Send code to builder (will trigger streaming)
+        onCodeGenerated(data.code);
+        
+        // 🆕 SALVA PROGETTO AUTOMATICAMENTE IN DATABASE
+        try {
+          console.log('💾 Saving project to database...');
+          await projectsService.saveAIWebsite(userId, data.code, data.generation?.id);
+          console.log('✅ Project saved to database!');
+        } catch (saveError) {
+          console.error('⚠️ Failed to save project (non-blocking):', saveError);
+          // Non blocchiamo l'UX se il salvataggio fallisce
+        }
         
         setHasGeneratedOnce(true);
         
         const successMsg = { 
           role: 'assistant', 
-          content: `✅ Progetto "${data.projectName}" generato! Guarda l'anteprima a destra. Usa il bottone "📦 Scarica ZIP" per scaricare i file. Se vuoi modifiche, scrivimi pure!`,
+          content: `✅ Sito web generato con successo! 
+          
+📊 Dettagli:
+• Step completati: ${data.generation?.steps_completed || '?'}
+• Tempo: ${data.generation?.duration_seconds || '?'}s
+• Crediti usati: ${data.credits?.used || '?'}
+• Crediti rimanenti: ${data.credits?.remaining || '?'}
+
+Guarda l'anteprima a destra! Se vuoi modifiche, scrivimi pure! 🚀`,
           tokensUsed: data.tokensUsed
         };
         setMessages(prev => [...prev, successMsg]);
@@ -235,7 +337,7 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
         }}
       >
         <h2 
-          className="text-lg font-semibold mb-1"
+          className="text-xl font-bold mb-1"
           style={{
             color: chlorophyTheme.colors.primary,
             fontFamily: chlorophyTheme.fonts.display,
@@ -287,7 +389,7 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
                 className="text-sm"
                 style={{ color: '#ffffff60' }}
               >
-                Esempio: "Voglio creare un sito e-commerce per sneakers streetwear"
+                Esempio: "Voglio una landing page moderna per la mia startup"
               </p>
             </div>
           </div>
@@ -300,11 +402,7 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
             >
-              <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                msg.role === 'user' 
-                  ? 'text-white' 
-                  : 'text-white'
-              }`}
+              <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-white`}
               style={{
                 background: msg.role === 'user'
                   ? chlorophyTheme.colors.gradients.primary
@@ -403,6 +501,43 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
             {error}
           </motion.div>
         )}
+
+        {/* Upgrade Alert */}
+        {showUpgradeAlert && (
+          <motion.div 
+            className="mb-3 px-4 py-3 rounded-lg"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              background: 'rgba(251, 191, 36, 0.2)',
+              border: '1px solid rgba(251, 191, 36, 0.4)',
+              color: '#FBBF24',
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-semibold mb-1">Crediti insufficienti!</p>
+                <p className="text-sm opacity-90 mb-3">
+                  Servono {creditsNeeded} crediti per questa operazione. Aggiorna il tuo piano per continuare!
+                </p>
+                <motion.button
+                  onClick={() => window.location.href = '/billing'}
+                  className="px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  style={{
+                    background: chlorophyTheme.colors.gradients.primary,
+                    color: chlorophyTheme.colors.dark,
+                  }}
+                >
+                  <CreditCard size={16} />
+                  Upgrade Piano
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
+        )}
         
         {/* Generate Website Button */}
         {showGenerateButton && !isGenerating && (
@@ -434,7 +569,7 @@ export default function ChatInterface({ onCodeGenerated, isGenerating, setIsGene
                 handleChat();
               }
             }}
-            placeholder={hasGeneratedOnce ? "Scrivi le modifiche che vuoi fare..." : "Rispondi alle domande o descrivi il tuo sito... (Invio per inviare)"}
+            placeholder={hasGeneratedOnce ? "Scrivi le modifiche che vuoi fare..." : "Descrivi il tuo sito... (Invio per inviare)"}
             className="flex-1 px-4 py-3 rounded-xl focus:outline-none resize-none"
             style={{
               background: 'rgba(255, 255, 255, 0.05)',

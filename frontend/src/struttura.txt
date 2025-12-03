@@ -1,0 +1,51 @@
+Elenco del percorso delle cartelle per il volume Windows
+Numero di serie del volume: 60B7-B8C5
+C:.
+¦   App.css
+¦   App.jsx
+¦   index.css
+¦   main.jsx
+¦   struttura.txt
+¦   
++---assets
+¦       react.svg
+¦       
++---components
+¦   ¦   ComingSoon.jsx
+¦   ¦   Logo.jsx
+¦   ¦   
+¦   +---auth
+¦   ¦       LoginForm.jsx
+¦   ¦       SignupForm.jsx
+¦   ¦       
+¦   +---builder
+¦   ¦       AIInsightPanel.jsx
+¦   ¦       Builder.jsx
+¦   ¦       ChatInterface.jsx
+¦   ¦       CodePanel.jsx
+¦   ¦       DeployPanel.jsx
+¦   ¦       GalaxyView.jsx
+¦   ¦       LivePreview.jsx
+¦   ¦       TabPortalSystem.jsx
+¦   ¦       
+¦   +---dashboard
+¦   ¦       Dashboard.jsx
+¦   ¦       
+¦   +---layout
+¦   ¦       MainLayout.jsx
+¦   ¦       Sidebar.jsx
+¦   ¦       
+¦   +---user
++---pages
+¦       Billing.jsx
+¦       Dashboard.jsx
+¦       MyProjects.jsx
+¦       Profile.jsx
+¦       Settings.jsx
+¦       
++---services
+¦       supabase.js
+¦       
++---styles
+        chlorophy-theme.js
+        

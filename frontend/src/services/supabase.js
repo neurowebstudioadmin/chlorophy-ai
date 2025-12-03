@@ -111,13 +111,13 @@ export const projectsService = {
       .from('projects')
       .select('*')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+      .order('updated_at', { ascending: false });
     
     if (error) throw error;
     return data || [];
   },
 
-  // Get project stats
+  // Get project stats (MANUAL - no SQL function)
   async getProjectStats(userId) {
     const { data, error } = await supabase
       .from('projects')
@@ -137,13 +137,35 @@ export const projectsService = {
     };
   },
 
-  // Create new project
+  // Get recent projects
+  async getRecentProjects(userId, limit = 6) {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false })
+      .limit(limit);
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  // Create new project (FIXED column names)
   async createProject(userId, projectData) {
     const { data, error } = await supabase
       .from('projects')
       .insert({
         user_id: userId,
-        ...projectData,
+        name: projectData.name || 'Untitled Project', // ✅ name not project_name
+        description: projectData.description || null,
+        html_content: projectData.html_content || projectData.code || '', // ✅ html_content
+        css_content: projectData.css_content || null, // ✅ css_content
+        js_content: projectData.js_content || null, // ✅ js_content
+        preview_image: projectData.preview_image || null, // ✅ preview_image
+        status: projectData.status || 'draft',
+        project_type: projectData.project_type || 'ai_generated', // ✅ project_type
+        generation_id: projectData.generation_id || null,
+        template_id: projectData.template_id || null,
       })
       .select()
       .single();
@@ -152,14 +174,56 @@ export const projectsService = {
     return data;
   },
 
-  // Update project
+  // Save AI-generated website (FIXED)
+  async saveAIWebsite(userId, generatedCode, generationId = null) {
+    try {
+      // Extract project name from code (from <title> tag)
+      const titleMatch = generatedCode.match(/<title[^>]*>(.*?)<\/title>/i);
+      const projectName = titleMatch ? titleMatch[1] : 'AI Generated Website';
+      
+      // Generate thumbnail URL (placeholder for now)
+      const previewImage = `https://placehold.co/400x300/1a1f3a/10b981?text=${encodeURIComponent(projectName.substring(0, 20))}`;
+      
+      const projectData = {
+        name: projectName,
+        description: `AI-generated website created on ${new Date().toLocaleDateString()}`,
+        html_content: generatedCode, // ✅ Use html_content
+        preview_image: previewImage, // ✅ Use preview_image
+        status: 'draft',
+        project_type: 'ai_generated', // ✅ Use project_type
+        generation_id: generationId,
+      };
+      
+      console.log('💾 Saving project with data:', projectData);
+      
+      return await this.createProject(userId, projectData);
+    } catch (error) {
+      console.error('Error saving AI website:', error);
+      throw error;
+    }
+  },
+
+  // Update project (FIXED column names)
   async updateProject(projectId, projectData) {
+    const updateData = {
+      updated_at: new Date().toISOString(),
+    };
+
+    // Only update fields that are provided
+    if (projectData.name) updateData.name = projectData.name;
+    if (projectData.description !== undefined) updateData.description = projectData.description;
+    if (projectData.html_content) updateData.html_content = projectData.html_content;
+    if (projectData.css_content !== undefined) updateData.css_content = projectData.css_content;
+    if (projectData.js_content !== undefined) updateData.js_content = projectData.js_content;
+    if (projectData.preview_image !== undefined) updateData.preview_image = projectData.preview_image;
+    if (projectData.status) updateData.status = projectData.status;
+    if (projectData.project_type) updateData.project_type = projectData.project_type;
+    if (projectData.deployed_url !== undefined) updateData.deployed_url = projectData.deployed_url;
+    if (projectData.deployed_at !== undefined) updateData.deployed_at = projectData.deployed_at;
+
     const { data, error } = await supabase
       .from('projects')
-      .update({
-        ...projectData,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', projectId)
       .select()
       .single();
@@ -176,5 +240,56 @@ export const projectsService = {
       .eq('id', projectId);
     
     if (error) throw error;
+  },
+
+  // Increment project views
+  async incrementViews(projectId) {
+    const { error } = await supabase
+      .rpc('increment_project_views', { p_project_id: projectId });
+    
+    if (error) {
+      console.error('Error incrementing views:', error);
+      // Fallback to manual increment
+      const { data: project } = await supabase
+        .from('projects')
+        .select('views_count')
+        .eq('id', projectId)
+        .single();
+      
+      if (project) {
+        await supabase
+          .from('projects')
+          .update({ views_count: (project.views_count || 0) + 1 })
+          .eq('id', projectId);
+      }
+    }
+  },
+};
+
+// Credits functions
+export const creditsService = {
+  // Get user credits info
+  async getCredits(userId) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('tier, credits_remaining, credits_total, credits_reset_date, subscription_status')
+      .eq('id', userId)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Get credit transactions history
+  async getTransactions(userId, limit = 50) {
+    const { data, error } = await supabase
+      .from('credit_transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    
+    if (error) throw error;
+    return data || [];
   },
 };

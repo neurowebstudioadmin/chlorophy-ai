@@ -1,24 +1,163 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ChatInterface from './ChatInterface';
 import TabPortalSystem from './TabPortalSystem';
 import CodePanel from './CodePanel';
-import GalaxyView from './GalaxyView';
+import LiveCodeStreaming from './LiveCodeStreaming';
+import WebsiteDNA from './WebsiteDNA';
 import DeployPanel from './DeployPanel';
-import AIInsightPanel from './AIInsightPanel';
 import { chlorophyTheme } from '../../styles/chlorophy-theme';
+import { Monitor, Tablet, Smartphone, Maximize2, Download, Crown, Zap, AlertCircle } from 'lucide-react';
+import { supabase } from '../../services/supabase';
+import { downloadProjectZip } from '../../utils/zipUtils';
 
-// Enhanced Preview Panel
+// 🎯 FUNZIONE PER ESTRARRE CSS E JS DALL'HTML
+function extractFilesFromHTML(htmlCode) {
+  if (!htmlCode) return null;
+
+  const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+  let cssContent = '';
+  let match;
+  while ((match = styleRegex.exec(htmlCode)) !== null) {
+    cssContent += match[1] + '\n\n';
+  }
+
+  const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+  let jsContent = '';
+  while ((match = scriptRegex.exec(htmlCode)) !== null) {
+    if (!match[0].includes('src=')) {
+      jsContent += match[1] + '\n\n';
+    }
+  }
+
+  let cleanHtml = htmlCode
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '  <!-- CSS moved to style.css -->')
+    .replace(/<script(?![^>]*src=)[^>]*>[\s\S]*?<\/script>/gi, '  <!-- JavaScript moved to script.js -->');
+
+  return {
+    'index.html': cleanHtml.trim(),
+    'style.css': cssContent.trim() || '/* No CSS found in HTML */\n\nbody {\n  margin: 0;\n  padding: 0;\n}',
+    'script.js': jsContent.trim() || '// No JavaScript found in HTML\n\nconsole.log("Website loaded!");'
+  };
+}
+
+// 💳 CREDITS DISPLAY COMPONENT
+function CreditsDisplay({ credits, tier, onUpgrade }) {
+  const tierConfig = {
+    free: { name: 'Free', color: '#6B7280', max: 10 },
+    pro: { name: 'Pro', color: '#10B981', max: 150 },
+    business: { name: 'Business', color: '#3B82F6', max: 500 },
+    premium: { name: 'Premium', color: '#8B5CF6', max: 1500 },
+    ultra: { name: 'Ultra', color: '#F59E0B', max: 5000 }
+  };
+
+  const currentTier = tierConfig[tier] || tierConfig.free;
+  const percentage = (credits / currentTier.max) * 100;
+  const isLow = percentage < 20;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex items-center gap-4 px-6 py-3 rounded-xl backdrop-blur-xl"
+      style={{
+        background: 'rgba(26, 31, 58, 0.8)',
+        border: `1px solid ${currentTier.color}40`,
+      }}
+    >
+      <div 
+        className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+        style={{
+          background: `${currentTier.color}20`,
+          border: `1px solid ${currentTier.color}40`,
+        }}
+      >
+        <Crown size={16} style={{ color: currentTier.color }} />
+        <span 
+          className="font-semibold text-sm"
+          style={{ color: currentTier.color }}
+        >
+          {currentTier.name}
+        </span>
+      </div>
+
+      <div className="flex-1 min-w-[200px]">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-sm font-medium" style={{ color: '#ffffff' }}>
+            💳 Crediti
+          </span>
+          <span 
+            className="text-sm font-bold"
+            style={{ color: isLow ? '#EF4444' : '#10B981' }}
+          >
+            {credits} / {currentTier.max}
+          </span>
+        </div>
+        <div 
+          className="h-2 rounded-full overflow-hidden"
+          style={{ background: 'rgba(255, 255, 255, 0.1)' }}
+        >
+          <motion.div
+            className="h-full rounded-full"
+            style={{
+              background: isLow 
+                ? 'linear-gradient(90deg, #EF4444, #F59E0B)'
+                : `linear-gradient(90deg, ${currentTier.color}, ${chlorophyTheme.colors.primary})`,
+            }}
+            initial={{ width: 0 }}
+            animate={{ width: `${percentage}%` }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
+          />
+        </div>
+      </div>
+
+      {isLow && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+          style={{
+            background: 'rgba(239, 68, 68, 0.2)',
+            border: '1px solid rgba(239, 68, 68, 0.4)',
+          }}
+        >
+          <AlertCircle size={16} style={{ color: '#EF4444' }} />
+          <span className="text-xs font-medium" style={{ color: '#EF4444' }}>
+            Crediti in esaurimento!
+          </span>
+        </motion.div>
+      )}
+
+      {tier === 'free' || isLow ? (
+        <motion.button
+          onClick={onUpgrade}
+          className="px-4 py-2 rounded-lg font-semibold text-sm flex items-center gap-2"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          style={{
+            background: chlorophyTheme.colors.gradients.primary,
+            color: chlorophyTheme.colors.dark,
+          }}
+        >
+          <Zap size={16} />
+          Upgrade
+        </motion.button>
+      ) : null}
+    </motion.div>
+  );
+}
+
+// 🎨 ENHANCED PREVIEW PANEL
 function MagicPreview({ code, isGenerating }) {
   const [viewMode, setViewMode] = useState('desktop');
 
-  const getPreviewWidth = () => {
-    switch(viewMode) {
-      case 'mobile': return '375px';
-      case 'tablet': return '768px';
-      default: return '100%';
-    }
-  };
+  const viewModes = [
+    { id: 'desktop', name: 'Desktop', icon: Monitor, width: '100%', height: '100%', color: '#10B981' },
+    { id: 'tablet', name: 'Tablet', icon: Tablet, width: '768px', height: '1024px', color: '#F59E0B' },
+    { id: 'mobile', name: 'Mobile', icon: Smartphone, width: '375px', height: '667px', color: '#8B5CF6' },
+  ];
+
+  const currentMode = viewModes.find(m => m.id === viewMode);
 
   const handleFullScreenPreview = () => {
     const blob = new Blob([code], { type: 'text/html' });
@@ -26,30 +165,16 @@ function MagicPreview({ code, isGenerating }) {
     window.open(url, '_blank');
   };
 
-  const handleDownloadZip = () => {
-    if (!window.chlorophyZipData) {
-      alert('Nessun progetto ZIP disponibile. Genera prima un sito!');
-      return;
+  const handleDownloadZip = async () => {
+    try {
+      const titleMatch = code.match(/<title[^>]*>(.*?)<\/title>/i);
+      const projectName = titleMatch ? titleMatch[1].replace(/[^a-z0-9]/gi, '-').toLowerCase() : 'chlorophy-project';
+      
+      await downloadProjectZip(code, projectName);
+    } catch (error) {
+      console.error('Error downloading ZIP:', error);
+      alert('Errore durante il download del progetto. Riprova!');
     }
-
-    const { zipData, projectName } = window.chlorophyZipData;
-    
-    const byteCharacters = atob(zipData);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-    const blob = new Blob([byteArray], { type: 'application/zip' });
-    
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${projectName}.zip`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
   };
 
   return (
@@ -60,7 +185,6 @@ function MagicPreview({ code, isGenerating }) {
         border: `1px solid ${chlorophyTheme.colors.secondary}20`,
       }}
     >
-      {/* Header */}
       <div 
         className="px-6 py-4 border-b backdrop-blur-xl flex items-center justify-between"
         style={{
@@ -85,38 +209,53 @@ function MagicPreview({ code, isGenerating }) {
               fontFamily: chlorophyTheme.fonts.body,
             }}
           >
-            Live website preview
+            {currentMode.name} view • {currentMode.width} × {currentMode.height}
           </p>
         </div>
         
-        {/* View Mode Switcher */}
         <div 
-          className="flex items-center gap-2 rounded-lg p-1"
+          className="flex items-center gap-2 rounded-xl p-1.5"
           style={{
-            background: 'rgba(255, 255, 255, 0.05)',
+            background: 'rgba(10, 14, 39, 0.8)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
           }}
         >
-          {['desktop', 'tablet', 'mobile'].map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              className="px-3 py-1.5 rounded-md text-sm font-medium transition-all"
-              style={{
-                background: viewMode === mode 
-                  ? `${chlorophyTheme.colors.secondary}30`
-                  : 'transparent',
-                color: viewMode === mode 
-                  ? chlorophyTheme.colors.secondary
-                  : '#ffffff60',
-              }}
-            >
-              {mode === 'desktop' ? '🖥️' : mode === 'tablet' ? '📱' : '📱'} {mode}
-            </button>
-          ))}
+          {viewModes.map((mode) => {
+            const isActive = viewMode === mode.id;
+            const Icon = mode.icon;
+            
+            return (
+              <motion.button
+                key={mode.id}
+                onClick={() => setViewMode(mode.id)}
+                className="relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                style={{
+                  background: isActive ? `${mode.color}20` : 'transparent',
+                  color: isActive ? mode.color : '#ffffff60',
+                  border: `1px solid ${isActive ? mode.color + '40' : 'transparent'}`,
+                }}
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="active-view"
+                    className="absolute inset-0 rounded-lg"
+                    style={{
+                      background: `${mode.color}15`,
+                      boxShadow: `0 0 20px ${mode.color}30`,
+                    }}
+                    transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+                <Icon size={18} className="relative" />
+                <span className="relative">{mode.name}</span>
+              </motion.button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Preview Area */}
       <div 
         className="flex-1 overflow-auto p-6"
         style={{
@@ -126,17 +265,17 @@ function MagicPreview({ code, isGenerating }) {
         {!code && !isGenerating ? (
           <div className="h-full flex items-center justify-center text-center">
             <div>
-              <div className="text-6xl mb-4">👁️</div>
-              <p 
-                className="text-lg"
-                style={{ color: '#ffffff80' }}
+              <motion.div
+                className="text-6xl mb-4"
+                animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
+                transition={{ duration: 3, repeat: Infinity }}
               >
+                👁️
+              </motion.div>
+              <p className="text-lg mb-2" style={{ color: '#ffffff80' }}>
                 Preview will appear here
               </p>
-              <p 
-                className="text-sm mt-2"
-                style={{ color: '#ffffff40' }}
-              >
+              <p className="text-sm" style={{ color: '#ffffff40' }}>
                 Generate a website to see the live preview
               </p>
             </div>
@@ -146,82 +285,76 @@ function MagicPreview({ code, isGenerating }) {
             <div className="text-center">
               <motion.div
                 className="w-16 h-16 border-4 rounded-full mx-auto mb-4"
-                style={{
-                  borderColor: chlorophyTheme.colors.secondary,
-                  borderTopColor: 'transparent',
-                }}
+                style={{ borderColor: chlorophyTheme.colors.secondary, borderTopColor: 'transparent' }}
                 animate={{ rotate: 360 }}
                 transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
               />
-              <p 
-                className="font-medium"
-                style={{ color: '#ffffff80' }}
-              >
+              <p className="font-medium" style={{ color: '#ffffff80' }}>
                 Generating your website...
               </p>
             </div>
           </div>
         ) : (
-          <div className="flex justify-center">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="rounded-lg shadow-xl transition-all duration-300"
-              style={{ 
-                width: getPreviewWidth(), 
-                minHeight: '600px',
-                boxShadow: `0 0 40px ${chlorophyTheme.colors.secondary}40`,
-              }}
-            >
-              <iframe
-                srcDoc={code}
-                className="w-full h-full rounded-lg"
-                style={{ minHeight: '600px' }}
-                title="Website Preview"
-                sandbox="allow-scripts"
-              />
-            </motion.div>
+          <div className="h-full flex items-center justify-center">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={viewMode}
+                initial={{ opacity: 0, scale: 0.95, rotateY: -10 }}
+                animate={{ opacity: 1, scale: 1, rotateY: 0 }}
+                exit={{ opacity: 0, scale: 0.95, rotateY: 10 }}
+                transition={{ duration: 0.4, type: 'spring', bounce: 0.3 }}
+                className="rounded-xl shadow-2xl transition-all"
+                style={{ 
+                  width: currentMode.width,
+                  height: currentMode.height,
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  boxShadow: `0 0 60px ${currentMode.color}40`,
+                  border: `2px solid ${currentMode.color}30`,
+                }}
+              >
+                <iframe
+                  srcDoc={code}
+                  title="Website Preview"
+                  className="w-full h-full rounded-xl"
+                  style={{ background: 'white' }}
+                  sandbox="allow-scripts allow-same-origin"
+                />
+              </motion.div>
+            </AnimatePresence>
           </div>
         )}
       </div>
 
-      {/* Footer Actions */}
-      {code && (
-        <div 
-          className="px-6 py-4 border-t flex gap-3"
-          style={{
-            background: 'rgba(26, 31, 58, 0.6)',
-            borderColor: `${chlorophyTheme.colors.secondary}20`,
-          }}
-        >
-          {window.chlorophyZipData && (
-            <motion.button
-              onClick={handleDownloadZip}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              style={{
-                background: `${chlorophyTheme.colors.accent}30`,
-                border: `1px solid ${chlorophyTheme.colors.accent}40`,
-                color: chlorophyTheme.colors.accent,
-              }}
-            >
-              📦 Scarica ZIP
-            </motion.button>
-          )}
-          
+      {code && !isGenerating && (
+        <div className="px-6 py-4 border-t backdrop-blur-xl flex gap-3">
           <motion.button
             onClick={handleFullScreenPreview}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
+            className="flex-1 px-4 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
             style={{
-              background: `${chlorophyTheme.colors.secondary}30`,
+              background: 'rgba(255, 255, 255, 0.1)',
               border: `1px solid ${chlorophyTheme.colors.secondary}40`,
               color: chlorophyTheme.colors.secondary,
             }}
           >
-            🚀 Vedi Anteprima
+            <Maximize2 size={16} />
+            View Preview
+          </motion.button>
+          
+          <motion.button
+            onClick={handleDownloadZip}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex-1 px-4 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
+            style={{
+              background: chlorophyTheme.colors.gradients.primary,
+              color: chlorophyTheme.colors.dark,
+            }}
+          >
+            <Download size={16} />
+            Download ZIP
           </motion.button>
         </div>
       )}
@@ -232,18 +365,84 @@ function MagicPreview({ code, isGenerating }) {
 export default function Builder() {
   const [generatedCode, setGeneratedCode] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [activeTab, setActiveTab] = useState('chat');
+  const [isRefining, setIsRefining] = useState(false);
+  const [activeTab, setActiveTab] = useState('streaming');
   const [projectFiles, setProjectFiles] = useState(null);
-  const [selectedFileIndex, setSelectedFileIndex] = useState(0);
+  const [credits, setCredits] = useState(null);
+  const [userTier, setUserTier] = useState('free');
+  const [userId, setUserId] = useState(null);
 
-  const handleCodeGenerated = (code) => {
+  useEffect(() => {
+    const fetchUserCredits = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        setUserId(user.id);
+
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/credits/${user.id}`);
+        const data = await response.json();
+
+        if (data.success) {
+          setCredits(data.credits.remaining);
+          setUserTier(data.credits.tier);
+        }
+      } catch (error) {
+        console.error('Error fetching credits:', error);
+      }
+    };
+
+    fetchUserCredits();
+  }, []);
+
+  useEffect(() => {
+    if (generatedCode) {
+      const files = extractFilesFromHTML(generatedCode);
+      setProjectFiles(files);
+      console.log('✅ Files extracted:', files);
+    }
+  }, [generatedCode]);
+
+  // 🎯 FLUSSO AUTOMATICO: Genera/Modifica → Streaming → Preview
+  const handleCodeGenerated = (code, isModification = false) => {
+    console.log('🎯 Code generated/modified. Switching to streaming...');
     setGeneratedCode(code);
-    setActiveTab('preview');
+    
+    if (isModification) {
+      setIsRefining(true);
+    }
+    
+    // Already on streaming, just update code
+    // Auto-switch to preview will happen in handleStreamComplete
   };
 
-  const handleFileSelect = (index) => {
-    setSelectedFileIndex(index);
-    setActiveTab('code');
+  // Called when user starts generation
+  const handleGenerationStart = (isModification = false) => {
+    console.log('🎯 Generation started. Switching to streaming...');
+    setActiveTab('streaming');
+    if (isModification) {
+      setIsRefining(true);
+    }
+  };
+
+  // Callback when streaming completes
+  const handleStreamComplete = () => {
+    console.log('✅ Streaming complete. Switching to preview in 2 seconds...');
+    setIsRefining(false);
+    
+    // Auto-switch to preview after 2 seconds
+    setTimeout(() => {
+      console.log('🎯 Now switching to preview!');
+      setActiveTab('preview');
+    }, 2000);
+  };
+
+  const handleCreditsUpdate = (newCredits) => {
+    setCredits(newCredits);
+  };
+
+  const handleUpgrade = () => {
+    window.location.href = '/billing';
   };
 
   return (
@@ -253,13 +452,12 @@ export default function Builder() {
         background: chlorophyTheme.colors.gradients.hero,
       }}
     >
-      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="max-w-[1800px] mx-auto mb-6"
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
             <h1 
               className="text-4xl font-bold"
@@ -285,68 +483,50 @@ export default function Builder() {
             </span>
           </div>
 
-          {/* TabPortalSystem con z-index alto */}
-          <div className="relative z-50">
-            <TabPortalSystem 
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-            />
-          </div>
+          <TabPortalSystem 
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          />
         </div>
+
+        {credits !== null && (
+          <CreditsDisplay 
+            credits={credits}
+            tier={userTier}
+            onUpgrade={handleUpgrade}
+          />
+        )}
       </motion.div>
 
-      {/* Main Content */}
       <div className="max-w-[1800px] mx-auto">
-        <div className="grid grid-cols-2 gap-6 h-[calc(100vh-180px)] relative">
-          {/* Left Panel - Always Chat */}
+        <div className="grid grid-cols-2 gap-6 h-[calc(100vh-240px)] relative">
           <div className="h-full">
             <ChatInterface
               onCodeGenerated={handleCodeGenerated}
+              onGenerationStart={handleGenerationStart}
               isGenerating={isGenerating}
               setIsGenerating={setIsGenerating}
               generatedCode={generatedCode}
+              onCreditsUpdate={handleCreditsUpdate}
             />
           </div>
 
-          {/* Right Panel - Dynamic based on activeTab */}
           <div className="h-full relative">
             <AnimatePresence mode="wait">
-              {activeTab === 'chat' && (
+              {activeTab === 'streaming' && (
                 <motion.div
-                  key="chat-placeholder"
+                  key="streaming"
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className="h-full flex items-center justify-center rounded-2xl"
-                  style={{
-                    background: 'rgba(10, 14, 39, 0.6)',
-                    border: `1px solid ${chlorophyTheme.colors.primary}20`,
-                  }}
+                  className="h-full"
                 >
-                  <div className="text-center">
-                    <motion.div
-                      animate={{
-                        scale: [1, 1.2, 1],
-                        rotate: [0, 360],
-                      }}
-                      transition={{
-                        duration: 3,
-                        repeat: Infinity,
-                      }}
-                      className="text-6xl mb-4"
-                    >
-                      ✨
-                    </motion.div>
-                    <p 
-                      className="text-xl font-medium"
-                      style={{
-                        color: chlorophyTheme.colors.primary,
-                        fontFamily: chlorophyTheme.fonts.display,
-                      }}
-                    >
-                      Start chatting to see magic happen!
-                    </p>
-                  </div>
+                  <LiveCodeStreaming
+                    isGenerating={isGenerating}
+                    isRefining={isRefining}
+                    generatedCode={generatedCode}
+                    onStreamComplete={handleStreamComplete}
+                  />
                 </motion.div>
               )}
 
@@ -380,18 +560,15 @@ export default function Builder() {
                 </motion.div>
               )}
 
-              {activeTab === 'galaxy' && (
+              {activeTab === 'dna' && (
                 <motion.div
-                  key="galaxy"
+                  key="dna"
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   className="h-full"
                 >
-                  <GalaxyView 
-                    onFileSelect={handleFileSelect}
-                    projectFiles={projectFiles}
-                  />
+                  <WebsiteDNA generatedCode={generatedCode} />
                 </motion.div>
               )}
 
@@ -414,13 +591,6 @@ export default function Builder() {
           </div>
         </div>
       </div>
-
-      {/* AI Insight Panel - Floating - SEMPRE VISIBILE quando c'è codice */}
-      <AIInsightPanel 
-        generatedCode={generatedCode}
-        isVisible={!!generatedCode}
-        onCodeImproved={setGeneratedCode}
-      />
     </div>
   );
 }

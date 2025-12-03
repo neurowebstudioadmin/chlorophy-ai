@@ -1,9 +1,57 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Text, Sphere, Trail } from '@react-three/drei';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { chlorophyTheme } from '../../styles/chlorophy-theme';
 import * as THREE from 'three';
+import { Play, Pause, Zap } from 'lucide-react';
+
+// Matrix Code Rain Effect
+function MatrixRain() {
+  const canvasRef = useRef();
+  
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<>{}[]()/*-+=;:';
+    const fontSize = 14;
+    const columns = canvas.width / fontSize;
+    const drops = Array(Math.floor(columns)).fill(1);
+    
+    function draw() {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      ctx.fillStyle = '#0F0';
+      ctx.font = `${fontSize}px monospace`;
+      
+      for (let i = 0; i < drops.length; i++) {
+        const text = chars[Math.floor(Math.random() * chars.length)];
+        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+        
+        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+          drops[i] = 0;
+        }
+        drops[i]++;
+      }
+    }
+    
+    const interval = setInterval(draw, 33);
+    return () => clearInterval(interval);
+  }, []);
+  
+  return (
+    <canvas
+      ref={canvasRef}
+      className="absolute inset-0 opacity-20 pointer-events-none"
+    />
+  );
+}
 
 // File Planet Component
 function FilePlanet({ position, color, label, size, onClick, isSelected }) {
@@ -12,10 +60,8 @@ function FilePlanet({ position, color, label, size, onClick, isSelected }) {
 
   useFrame((state) => {
     if (meshRef.current) {
-      // Rotate planet
       meshRef.current.rotation.y += 0.01;
       
-      // Pulse effect when selected
       if (isSelected) {
         meshRef.current.scale.setScalar(size + Math.sin(state.clock.elapsedTime * 3) * 0.1);
       } else if (hovered) {
@@ -28,7 +74,6 @@ function FilePlanet({ position, color, label, size, onClick, isSelected }) {
 
   return (
     <group position={position}>
-      {/* Planet Sphere */}
       <Trail
         width={2}
         length={6}
@@ -52,7 +97,6 @@ function FilePlanet({ position, color, label, size, onClick, isSelected }) {
         </Sphere>
       </Trail>
 
-      {/* Orbiting Ring */}
       {(hovered || isSelected) && (
         <mesh rotation={[Math.PI / 2, 0, 0]}>
           <torusGeometry args={[1.5, 0.02, 16, 100]} />
@@ -60,19 +104,16 @@ function FilePlanet({ position, color, label, size, onClick, isSelected }) {
         </mesh>
       )}
 
-      {/* Label */}
       <Text
         position={[0, -1.8, 0]}
         fontSize={0.3}
         color={hovered || isSelected ? color : '#ffffff80'}
         anchorX="center"
         anchorY="middle"
-        font="/fonts/inter-bold.woff"
       >
         {label}
       </Text>
 
-      {/* Glow effect */}
       <pointLight
         position={[0, 0, 0]}
         color={color}
@@ -83,7 +124,7 @@ function FilePlanet({ position, color, label, size, onClick, isSelected }) {
   );
 }
 
-// Connection Lines between files
+// Connection Lines
 function ConnectionLine({ start, end, color }) {
   const points = [
     new THREE.Vector3(...start),
@@ -104,39 +145,92 @@ function ConnectionLine({ start, end, color }) {
   );
 }
 
+// 🌟 GALACTIC BUTTON CENTERPIECE
+function GalacticCore({ isActive, onClick }) {
+  const coreRef = useRef();
+  
+  useFrame((state) => {
+    if (coreRef.current) {
+      coreRef.current.rotation.y += 0.02;
+      coreRef.current.rotation.x += 0.01;
+      
+      if (isActive) {
+        const pulse = Math.sin(state.clock.elapsedTime * 2) * 0.3 + 1;
+        coreRef.current.scale.setScalar(pulse);
+      }
+    }
+  });
+  
+  return (
+    <group position={[0, 0, 0]} onClick={onClick}>
+      {/* Core Sphere */}
+      <Sphere ref={coreRef} args={[0.8, 32, 32]}>
+        <meshStandardMaterial
+          color={chlorophyTheme.colors.primary}
+          emissive={chlorophyTheme.colors.primary}
+          emissiveIntensity={isActive ? 2 : 1}
+          roughness={0.1}
+          metalness={1}
+          transparent
+          opacity={0.9}
+        />
+      </Sphere>
+      
+      {/* Orbiting Rings */}
+      {[0, 60, 120].map((angle, i) => (
+        <mesh 
+          key={i} 
+          rotation={[
+            (angle * Math.PI) / 180,
+            (angle * Math.PI) / 180,
+            0
+          ]}
+        >
+          <torusGeometry args={[1.2, 0.03, 16, 100]} />
+          <meshBasicMaterial 
+            color={chlorophyTheme.colors.primary} 
+            transparent 
+            opacity={0.5} 
+          />
+        </mesh>
+      ))}
+      
+      {/* Glow */}
+      <pointLight
+        color={chlorophyTheme.colors.primary}
+        intensity={isActive ? 3 : 1.5}
+        distance={10}
+      />
+      
+      {/* Icon */}
+      <Text
+        position={[0, 0, 0]}
+        fontSize={0.5}
+        color="#ffffff"
+        anchorX="center"
+        anchorY="middle"
+      >
+        {isActive ? '⏸' : '▶'}
+      </Text>
+    </group>
+  );
+}
+
 // Main Galaxy Scene
-function GalaxyScene({ onFileSelect, selectedFile }) {
+function GalaxyScene({ onFileSelect, selectedFile, isLiveMode, onCoreClick }) {
   const files = [
-    { 
-      name: 'index.html', 
-      position: [0, 0, 0], 
-      color: '#E34C26', 
-      size: 1.5,
-      label: 'HTML',
-    },
-    { 
-      name: 'style.css', 
-      position: [-4, 2, -2], 
-      color: '#264DE4', 
-      size: 1.2,
-      label: 'CSS',
-    },
-    { 
-      name: 'script.js', 
-      position: [4, -2, 2], 
-      color: '#F7DF1E', 
-      size: 1.2,
-      label: 'JS',
-    },
+    { name: 'index.html', position: [-4, 0, 0], color: '#E34C26', size: 1.5, label: 'HTML' },
+    { name: 'style.css', position: [0, 3, -2], color: '#264DE4', size: 1.2, label: 'CSS' },
+    { name: 'script.js', position: [4, 0, 2], color: '#F7DF1E', size: 1.2, label: 'JS' },
   ];
 
   return (
     <>
-      {/* Ambient Light */}
       <ambientLight intensity={0.3} />
-      
-      {/* Main Light */}
       <pointLight position={[10, 10, 10]} intensity={1} />
+
+      {/* 🌟 GALACTIC CORE BUTTON */}
+      <GalacticCore isActive={isLiveMode} onClick={onCoreClick} />
 
       {/* File Planets */}
       {files.map((file, index) => (
@@ -151,17 +245,15 @@ function GalaxyScene({ onFileSelect, selectedFile }) {
         />
       ))}
 
-      {/* Connection Lines */}
-      <ConnectionLine 
-        start={files[0].position} 
-        end={files[1].position} 
-        color={chlorophyTheme.colors.primary} 
-      />
-      <ConnectionLine 
-        start={files[0].position} 
-        end={files[2].position} 
-        color={chlorophyTheme.colors.primary} 
-      />
+      {/* Connection Lines from Core to Planets */}
+      {files.map((file) => (
+        <ConnectionLine 
+          key={file.name}
+          start={[0, 0, 0]} 
+          end={file.position} 
+          color={file.color} 
+        />
+      ))}
 
       {/* Stars Background */}
       {[...Array(200)].map((_, i) => {
@@ -175,31 +267,156 @@ function GalaxyScene({ onFileSelect, selectedFile }) {
         );
       })}
 
-      {/* Camera Controls */}
       <OrbitControls
         enableZoom={true}
         enablePan={true}
         enableRotate={true}
         minDistance={5}
         maxDistance={20}
-        autoRotate={true}
+        autoRotate={!isLiveMode}
         autoRotateSpeed={0.5}
       />
     </>
   );
 }
 
+// Live Code Stream Display
+function LiveCodeStream({ isActive, code }) {
+  const [displayedCode, setDisplayedCode] = useState('');
+  
+  useEffect(() => {
+    if (!isActive || !code) {
+      setDisplayedCode('');
+      return;
+    }
+    
+    let index = 0;
+    const interval = setInterval(() => {
+      if (index < code.length) {
+        setDisplayedCode(code.substring(0, index));
+        index += Math.floor(Math.random() * 5) + 1;
+      } else {
+        clearInterval(interval);
+      }
+    }, 30);
+    
+    return () => clearInterval(interval);
+  }, [isActive, code]);
+  
+  if (!isActive) return null;
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      className="absolute right-4 top-20 bottom-4 w-96 backdrop-blur-xl rounded-2xl overflow-hidden"
+      style={{
+        background: 'rgba(0, 0, 0, 0.9)',
+        border: `1px solid ${chlorophyTheme.colors.primary}40`,
+        boxShadow: `0 0 40px ${chlorophyTheme.colors.primary}40`,
+      }}
+    >
+      <div 
+        className="px-4 py-3 border-b flex items-center justify-between"
+        style={{
+          background: 'rgba(26, 31, 58, 0.8)',
+          borderColor: `${chlorophyTheme.colors.primary}20`,
+        }}
+      >
+        <div className="flex items-center gap-2">
+          <Zap size={18} style={{ color: chlorophyTheme.colors.primary }} />
+          <span 
+            className="text-sm font-bold"
+            style={{ 
+              color: chlorophyTheme.colors.primary,
+              fontFamily: chlorophyTheme.fonts.display,
+            }}
+          >
+            Live Code Stream
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          <motion.div
+            className="w-2 h-2 rounded-full"
+            style={{ background: '#10B981' }}
+            animate={{ opacity: [1, 0.3, 1] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+          />
+          <span className="text-xs" style={{ color: '#10B981' }}>
+            LIVE
+          </span>
+        </div>
+      </div>
+      
+      <div className="p-4 h-full overflow-auto">
+        <pre 
+          className="text-xs leading-relaxed"
+          style={{
+            color: '#0F0',
+            fontFamily: 'monospace',
+            textShadow: `0 0 5px ${chlorophyTheme.colors.primary}`,
+          }}
+        >
+          {displayedCode}
+          <motion.span
+            animate={{ opacity: [1, 0, 1] }}
+            transition={{ duration: 0.5, repeat: Infinity }}
+          >
+            ▋
+          </motion.span>
+        </pre>
+      </div>
+    </motion.div>
+  );
+}
+
 export default function GalaxyView({ onFileSelect, projectFiles }) {
   const [selectedFile, setSelectedFile] = useState(null);
-  const [isRotating, setIsRotating] = useState(true);
+  const [isLiveMode, setIsLiveMode] = useState(false);
+  
+  // Simulate code for demo
+  const sampleCode = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI Generated Site</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .hero {
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <h1>Welcome to the Future</h1>
+  </div>
+</body>
+</html>`;
 
   const handleFileSelect = (index) => {
     setSelectedFile(index);
     onFileSelect(index);
   };
+  
+  const handleCoreClick = () => {
+    setIsLiveMode(!isLiveMode);
+  };
 
   return (
     <div className="relative h-full w-full rounded-2xl overflow-hidden">
+      {/* Matrix Rain Effect */}
+      {isLiveMode && <MatrixRain />}
+      
       {/* 3D Canvas */}
       <Canvas
         camera={{ position: [0, 5, 10], fov: 50 }}
@@ -210,6 +427,8 @@ export default function GalaxyView({ onFileSelect, projectFiles }) {
         <GalaxyScene 
           onFileSelect={handleFileSelect}
           selectedFile={selectedFile}
+          isLiveMode={isLiveMode}
+          onCoreClick={handleCoreClick}
         />
       </Canvas>
 
@@ -240,10 +459,22 @@ export default function GalaxyView({ onFileSelect, projectFiles }) {
               fontFamily: chlorophyTheme.fonts.body,
             }}
           >
-            Your project visualized in 3D space. Click planets to view files.
+            {isLiveMode 
+              ? '⚡ Live mode activated! Watch the code materialize in real-time.' 
+              : 'Your project visualized in 3D space. Click the central core to activate live mode.'}
           </p>
         </motion.div>
       </div>
+
+      {/* Live Code Stream */}
+      <AnimatePresence>
+        {isLiveMode && (
+          <LiveCodeStream 
+            isActive={isLiveMode} 
+            code={sampleCode}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Instructions */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
@@ -263,29 +494,9 @@ export default function GalaxyView({ onFileSelect, projectFiles }) {
             🔍 Scroll to zoom
           </span>
           <span className="text-xs" style={{ color: '#ffffff60' }}>
-            👆 Click planets to select
+            ⭐ Click core to activate
           </span>
         </motion.div>
-      </div>
-
-      {/* Auto-rotate toggle */}
-      <div className="absolute top-4 right-4">
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setIsRotating(!isRotating)}
-          className="backdrop-blur-xl rounded-full p-3"
-          style={{
-            background: isRotating 
-              ? `${chlorophyTheme.colors.primary}30`
-              : 'rgba(10, 14, 39, 0.8)',
-            border: `1px solid ${chlorophyTheme.colors.primary}40`,
-          }}
-        >
-          <span className="text-xl">
-            {isRotating ? '⏸️' : '▶️'}
-          </span>
-        </motion.button>
       </div>
     </div>
   );
