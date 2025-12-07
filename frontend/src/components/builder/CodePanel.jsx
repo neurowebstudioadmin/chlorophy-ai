@@ -1,429 +1,329 @@
-import { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Copy, Check, Download, FileCode, Zap, ChevronDown } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { Download, Copy, Check, ChevronDown } from 'lucide-react';
 import { chlorophyTheme } from '../../styles/chlorophy-theme';
-import toast, { Toaster } from 'react-hot-toast';
+import { downloadProjectZip } from '../../utils/zipUtils';
 
-const files = [
-  { name: 'index.html', language: 'html', icon: '🌐', color: '#E34C26' },
-  { name: 'style.css', language: 'css', icon: '🎨', color: '#264DE4' },
-  { name: 'script.js', language: 'javascript', icon: '⚡', color: '#F7DF1E' },
-];
+const CodePanel = ({ generatedCode, projectFiles }) => {
+  const [activeTab, setActiveTab] = useState('html');
+  const [copied, setCopied] = useState(false);
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
+  const downloadRef = useRef(null);
 
-export default function CodePanel({ generatedCode, projectFiles }) {
-  const [activeFile, setActiveFile] = useState(0);
-  const [copiedFile, setCopiedFile] = useState(null);
-  const [hoveredLine, setHoveredLine] = useState(null);
-  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (downloadRef.current && !downloadRef.current.contains(event.target)) {
+        setDownloadMenuOpen(false);
+      }
+    };
 
-  const getFileContent = (fileName) => {
-    if (!projectFiles) {
-      if (fileName === 'index.html') return generatedCode || '';
-      return '// File not generated yet';
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const tabs = [
+    { id: 'html', label: 'HTML', icon: '📄', language: 'html', code: projectFiles?.html || '' },
+    { id: 'css', label: 'CSS', icon: '🎨', language: 'css', code: projectFiles?.css || '' },
+    { id: 'javascript', label: 'JavaScript', icon: '⚡', language: 'javascript', code: projectFiles?.javascript || '' }
+  ];
+
+  const currentTab = tabs.find(t => t.id === activeTab);
+  const currentCode = currentTab?.code || '';
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(currentCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
     }
-    return projectFiles[fileName] || '// File not available';
   };
 
-  const handleCopy = (fileName, content) => {
-    navigator.clipboard.writeText(content);
-    setCopiedFile(fileName);
-    
-    toast.success(`${fileName} copied!`, {
-      icon: '📋',
-      style: {
-        background: chlorophyTheme.colors.dark,
-        color: chlorophyTheme.colors.primary,
-        border: `1px solid ${chlorophyTheme.colors.primary}40`,
-      },
-    });
-    
-    setTimeout(() => setCopiedFile(null), 2000);
-  };
+  const handleDownloadSingle = (fileType) => {
+    const fileMap = {
+      html: { name: 'index.html', code: projectFiles?.html || '' },
+      css: { name: 'style.css', code: projectFiles?.css || '' },
+      javascript: { name: 'script.js', code: projectFiles?.javascript || '' }
+    };
 
-  const handleDownloadFile = (fileName, content) => {
-    const blob = new Blob([content], { type: 'text/plain' });
+    const file = fileMap[fileType];
+    const blob = new Blob([file.code], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = fileName;
+    a.download = file.name;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
-    toast.success(`${fileName} downloaded!`, {
-      icon: '💾',
-      style: {
-        background: chlorophyTheme.colors.dark,
-        color: '#FFD700',
-        border: '1px solid #FFD70060',
-      },
-    });
-    
-    setShowDownloadMenu(false);
+    setDownloadMenuOpen(false);
   };
 
-  const handleDownloadAll = () => {
-    if (!projectFiles) {
-      toast.error('No files to download yet!');
-      return;
+  const handleDownloadAll = async () => {
+    try {
+      const titleMatch = generatedCode.match(/<title[^>]*>(.*?)<\/title>/i);
+      const projectName = titleMatch ? titleMatch[1].replace(/[^a-z0-9]/gi, '-').toLowerCase() : 'chlorophy-project';
+      
+      console.log('Downloading ZIP with files:', {
+        html: projectFiles?.html?.length || 0,
+        css: projectFiles?.css?.length || 0,
+        js: projectFiles?.javascript?.length || 0
+      });
+      
+      await downloadProjectZip(projectFiles, projectName);
+      setDownloadMenuOpen(false);
+    } catch (error) {
+      console.error('Error downloading ZIP:', error);
+      alert('Error downloading project!');
     }
-
-    Object.entries(projectFiles).forEach(([fileName, content], index) => {
-      setTimeout(() => {
-        handleDownloadFile(fileName, content);
-      }, index * 200);
-    });
-
-    toast.success('Downloading all files!', {
-      icon: '📦',
-      style: {
-        background: chlorophyTheme.colors.dark,
-        color: '#FFD700',
-        border: '1px solid #FFD70060',
-      },
-    });
-    
-    setShowDownloadMenu(false);
   };
 
-  const currentFile = files[activeFile];
-  const currentContent = getFileContent(currentFile.name);
-  const lineCount = currentContent.split('\n').length;
+  const getFileSize = (code) => {
+    if (!code) return '0 B';
+    const bytes = new Blob([code]).size;
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const downloadOptions = [
+    { id: 'html', label: 'Download HTML', icon: '📄', action: () => handleDownloadSingle('html') },
+    { id: 'css', label: 'Download CSS', icon: '🎨', action: () => handleDownloadSingle('css') },
+    { id: 'javascript', label: 'Download JavaScript', icon: '⚡', action: () => handleDownloadSingle('javascript') },
+    { id: 'divider', isDivider: true },
+    { id: 'all', label: 'Download All (ZIP)', icon: '📦', action: handleDownloadAll }
+  ];
 
   return (
     <div 
       className="h-full flex flex-col rounded-2xl overflow-hidden"
       style={{
         background: chlorophyTheme.colors.dark,
-        border: `1px solid ${chlorophyTheme.colors.primary}20`,
+        border: `1px solid ${chlorophyTheme.colors.secondary}20`,
       }}
     >
-      <Toaster position="top-right" />
-
-      {/* Header with File Tabs */}
       <div 
-        className="flex items-center justify-between px-3 py-2 border-b"
+        className="px-6 py-4 border-b backdrop-blur-xl"
         style={{
           background: 'rgba(26, 31, 58, 0.6)',
-          borderColor: `${chlorophyTheme.colors.primary}20`,
+          borderColor: `${chlorophyTheme.colors.secondary}20`,
         }}
       >
-        {/* File Tabs - PIÙ COMPATTI */}
-        <div className="flex items-center gap-1">
-          {files.map((file, index) => {
-            const isActive = activeFile === index;
-            return (
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 
+              className="text-lg font-semibold"
+              style={{
+                color: chlorophyTheme.colors.secondary,
+                fontFamily: chlorophyTheme.fonts.display,
+              }}
+            >
+              Source Code
+            </h2>
+            <p 
+              className="text-sm"
+              style={{
+                color: '#ffffff60',
+                fontFamily: chlorophyTheme.fonts.body,
+              }}
+            >
+              View and download your files
+            </p>
+          </div>
+
+          {currentCode && (
+            <div className="flex gap-2">
               <motion.button
-                key={file.name}
-                onClick={() => setActiveFile(index)}
-                className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all"
+                onClick={handleCopy}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
+                className="px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2"
                 style={{
-                  background: isActive ? `${file.color}20` : 'transparent',
-                  border: `1px solid ${isActive ? file.color : 'transparent'}`,
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: `1px solid ${chlorophyTheme.colors.secondary}40`,
+                  color: chlorophyTheme.colors.secondary,
                 }}
               >
-                {isActive && (
-                  <motion.div
-                    layoutId="active-file"
-                    className="absolute inset-0 rounded-lg"
-                    style={{
-                      background: `${file.color}15`,
-                      boxShadow: `0 0 20px ${file.color}40`,
-                    }}
-                    transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
-                  />
-                )}
+                {copied ? <Check size={16} /> : <Copy size={16} />}
+                {copied ? 'Copied!' : 'Copy'}
+              </motion.button>
 
-                <span className="relative text-base">{file.icon}</span>
-                <span 
-                  className="relative text-xs font-medium"
+              <div className="relative" ref={downloadRef}>
+                <motion.button
+                  onClick={() => setDownloadMenuOpen(!downloadMenuOpen)}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2"
                   style={{
-                    color: isActive ? file.color : '#ffffff60',
-                    fontFamily: chlorophyTheme.fonts.code,
+                    background: chlorophyTheme.colors.gradients.primary,
+                    color: chlorophyTheme.colors.dark,
                   }}
                 >
-                  {file.name}
-                </span>
+                  <Download size={16} />
+                  Download
+                  <ChevronDown size={16} />
+                </motion.button>
 
-                {isActive && (
-                  <motion.div
-                    className="absolute -inset-1 rounded-lg -z-10"
-                    style={{
-                      background: `radial-gradient(circle, ${file.color}30, transparent 70%)`,
-                    }}
-                    animate={{ opacity: [0.5, 0.8, 0.5] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  />
+                <AnimatePresence>
+                  {downloadMenuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 mt-2 rounded-xl overflow-hidden shadow-2xl z-50"
+                      style={{
+                        background: 'rgba(26, 31, 58, 0.95)',
+                        border: `1px solid ${chlorophyTheme.colors.secondary}40`,
+                        backdropFilter: 'blur(20px)',
+                        minWidth: '220px',
+                      }}
+                    >
+                      {downloadOptions.map((option) => {
+                        if (option.isDivider) {
+                          return (
+                            <div
+                              key={option.id}
+                              className="my-1"
+                              style={{
+                                height: '1px',
+                                background: 'rgba(255, 255, 255, 0.1)',
+                              }}
+                            />
+                          );
+                        }
+
+                        return (
+                          <motion.button
+                            key={option.id}
+                            onClick={option.action}
+                            whileHover={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
+                            className="w-full px-4 py-3 flex items-center gap-3 text-left text-sm font-medium transition-colors"
+                            style={{
+                              color: option.id === 'all' ? chlorophyTheme.colors.primary : '#ffffff',
+                            }}
+                          >
+                            <span className="text-lg">{option.icon}</span>
+                            <span>{option.label}</span>
+                          </motion.button>
+                        );
+                      })}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-2">
+          {tabs.map(tab => {
+            const hasCode = tab.code && tab.code.length > 50;
+            
+            return (
+              <motion.button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="px-4 py-2.5 rounded-lg font-medium text-sm flex items-center gap-2 transition-all"
+                style={{
+                  background: activeTab === tab.id 
+                    ? 'rgba(16, 185, 129, 0.2)' 
+                    : 'rgba(255, 255, 255, 0.05)',
+                  border: `1px solid ${activeTab === tab.id 
+                    ? 'rgba(16, 185, 129, 0.4)' 
+                    : 'rgba(255, 255, 255, 0.1)'}`,
+                  color: activeTab === tab.id ? '#10B981' : '#ffffff80',
+                }}
+              >
+                <span className="text-base">{tab.icon}</span>
+                <span>{tab.label}</span>
+                <span className="text-xs opacity-60">
+                  {getFileSize(tab.code)}
+                </span>
+                {hasCode && (
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                 )}
               </motion.button>
             );
           })}
         </div>
+      </div>
 
-        {/* Action Buttons - PIÙ COMPATTI */}
-        <div className="flex items-center gap-2">
-          {/* Copy Button */}
-          <motion.button
-            onClick={() => handleCopy(currentFile.name, currentContent)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            style={{
-              background: `${chlorophyTheme.colors.primary}20`,
-              border: `1px solid ${chlorophyTheme.colors.primary}40`,
+      <div className="flex-1 overflow-auto bg-gray-900">
+        {!generatedCode ? (
+          <div className="h-full flex items-center justify-center text-center">
+            <div>
+              <motion.div
+                className="text-6xl mb-4"
+                animate={{ scale: [1, 1.1, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                💻
+              </motion.div>
+              <p className="text-lg mb-2" style={{ color: '#ffffff80' }}>
+                No code generated yet
+              </p>
+              <p className="text-sm" style={{ color: '#ffffff40' }}>
+                Generate a website to view the source code
+              </p>
+            </div>
+          </div>
+        ) : currentCode ? (
+          <SyntaxHighlighter
+            language={currentTab.language}
+            style={vscDarkPlus}
+            showLineNumbers
+            customStyle={{
+              margin: 0,
+              padding: '1.5rem',
+              background: 'transparent',
+              fontSize: '0.875rem',
             }}
           >
-            {copiedFile === currentFile.name ? (
-              <Check size={16} style={{ color: chlorophyTheme.colors.primary }} />
-            ) : (
-              <Copy size={16} style={{ color: chlorophyTheme.colors.primary }} />
-            )}
-            <span 
-              className="text-xs font-medium"
-              style={{ 
-                color: chlorophyTheme.colors.primary,
-                fontFamily: chlorophyTheme.fonts.body,
-              }}
-            >
-              {copiedFile === currentFile.name ? 'Copied!' : 'Copy'}
-            </span>
-          </motion.button>
-
-          {/* Download Button - ORO */}
-          <div className="relative">
-            <motion.button
-              onClick={() => setShowDownloadMenu(!showDownloadMenu)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              style={{
-                background: '#FFD700',
-                border: '2px solid #FFA500',
-                color: '#000000',
-              }}
-            >
-              <Download size={16} style={{ color: '#000000' }} />
-              <span className="text-xs font-bold" style={{ color: '#000000' }}>
-                Download
-              </span>
-              <ChevronDown 
-                size={14}
-                style={{
-                  color: '#000000',
-                  transform: showDownloadMenu ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.3s',
-                }}
-              />
-            </motion.button>
-
-            {/* DROPDOWN MENU */}
-            <AnimatePresence>
-              {showDownloadMenu && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                  transition={{ duration: 0.2 }}
-                  className="absolute right-0 mt-2 rounded-xl overflow-hidden shadow-2xl z-50"
-                  style={{
-                    background: 'rgba(26, 31, 58, 0.98)',
-                    border: '2px solid #FFD70060',
-                    backdropFilter: 'blur(10px)',
-                    minWidth: '220px',
-                    boxShadow: '0 0 40px #FFD70040, 0 8px 32px rgba(0,0,0,0.4)',
-                  }}
-                >
-                  {/* HTML Option */}
-                  <motion.button
-                    onClick={() => handleDownloadFile('index.html', getFileContent('index.html'))}
-                    className="w-full flex items-center gap-3 px-5 py-4 transition-all text-left"
-                    whileHover={{ background: '#E34C2630', x: 5 }}
-                    style={{
-                      borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                    }}
-                  >
-                    <span className="text-2xl">🌐</span>
-                    <div>
-                      <p className="text-sm font-bold" style={{ color: '#E34C26' }}>
-                        index.html
-                      </p>
-                      <p className="text-xs" style={{ color: '#ffffff80' }}>
-                        HTML structure
-                      </p>
-                    </div>
-                  </motion.button>
-
-                  {/* CSS Option */}
-                  <motion.button
-                    onClick={() => handleDownloadFile('style.css', getFileContent('style.css'))}
-                    className="w-full flex items-center gap-3 px-5 py-4 transition-all text-left"
-                    whileHover={{ background: '#264DE430', x: 5 }}
-                    style={{
-                      borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                    }}
-                  >
-                    <span className="text-2xl">🎨</span>
-                    <div>
-                      <p className="text-sm font-bold" style={{ color: '#264DE4' }}>
-                        style.css
-                      </p>
-                      <p className="text-xs" style={{ color: '#ffffff80' }}>
-                        Styling & design
-                      </p>
-                    </div>
-                  </motion.button>
-
-                  {/* JS Option */}
-                  <motion.button
-                    onClick={() => handleDownloadFile('script.js', getFileContent('script.js'))}
-                    className="w-full flex items-center gap-3 px-5 py-4 transition-all text-left"
-                    whileHover={{ background: '#F7DF1E30', x: 5 }}
-                    style={{
-                      borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                    }}
-                  >
-                    <span className="text-2xl">⚡</span>
-                    <div>
-                      <p className="text-sm font-bold" style={{ color: '#F7DF1E' }}>
-                        script.js
-                      </p>
-                      <p className="text-xs" style={{ color: '#ffffff80' }}>
-                        JavaScript logic
-                      </p>
-                    </div>
-                  </motion.button>
-
-                  {/* ALL FILES Option */}
-                  <motion.button
-                    onClick={handleDownloadAll}
-                    className="w-full flex items-center gap-3 px-5 py-4 transition-all text-left"
-                    whileHover={{ background: '#FFD70030', x: 5 }}
-                    style={{
-                      background: '#FFD70020',
-                    }}
-                  >
-                    <span className="text-2xl">📦</span>
-                    <div>
-                      <p className="text-base font-black" style={{ color: '#FFD700' }}>
-                        ALL FILES
-                      </p>
-                      <p className="text-xs" style={{ color: '#ffffff80' }}>
-                        Download everything
-                      </p>
-                    </div>
-                  </motion.button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Click outside to close */}
-            {showDownloadMenu && (
-              <div
-                className="fixed inset-0 z-40"
-                onClick={() => setShowDownloadMenu(false)}
-              />
-            )}
+            {currentCode}
+          </SyntaxHighlighter>
+        ) : (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center">
+              <div className="text-4xl mb-4 opacity-50">{currentTab?.icon}</div>
+              <p className="text-gray-500">No {currentTab?.label} code</p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Code Area */}
-      <div className="flex-1 overflow-hidden flex">
-        {/* Line Numbers */}
+      {currentCode && (
         <div 
-          className="flex flex-col py-4 px-2 text-right select-none border-r"
+          className="px-6 py-3 border-t flex items-center justify-between text-sm"
           style={{
-            background: 'rgba(10, 14, 39, 0.5)',
-            borderColor: `${chlorophyTheme.colors.primary}10`,
-            fontFamily: chlorophyTheme.fonts.code,
-            fontSize: '12px',
-            color: '#ffffff30',
+            background: 'rgba(26, 31, 58, 0.6)',
+            borderColor: `${chlorophyTheme.colors.secondary}20`,
+            color: '#ffffff80',
           }}
         >
-          {[...Array(lineCount)].map((_, i) => (
-            <div
-              key={i}
-              className="px-2 leading-6 transition-all"
-              onMouseEnter={() => setHoveredLine(i)}
-              onMouseLeave={() => setHoveredLine(null)}
-              style={{
-                color: hoveredLine === i ? currentFile.color : '#ffffff30',
-                background: hoveredLine === i ? `${currentFile.color}10` : 'transparent',
-              }}
-            >
-              {i + 1}
-            </div>
-          ))}
-        </div>
-
-        {/* Code Content */}
-        <div className="flex-1 overflow-auto">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeFile}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.3 }}
-              className="h-full"
-            >
-              <SyntaxHighlighter
-                language={currentFile.language}
-                style={vscDarkPlus}
-                showLineNumbers={false}
-                customStyle={{
-                  margin: 0,
-                  padding: '16px',
-                  background: 'transparent',
-                  fontSize: '13px',
-                  fontFamily: chlorophyTheme.fonts.code,
-                  lineHeight: '1.6',
-                }}
-                codeTagProps={{
-                  style: {
-                    fontFamily: chlorophyTheme.fonts.code,
-                  }
-                }}
-              >
-                {currentContent}
-              </SyntaxHighlighter>
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </div>
-
-      {/* Footer Stats */}
-      <div 
-        className="flex items-center justify-between px-4 py-2 border-t text-xs"
-        style={{
-          background: 'rgba(26, 31, 58, 0.6)',
-          borderColor: `${chlorophyTheme.colors.primary}20`,
-          fontFamily: chlorophyTheme.fonts.code,
-        }}
-      >
-        <div className="flex items-center gap-4">
-          <span style={{ color: '#ffffff60' }}>
-            <FileCode size={14} className="inline mr-1" style={{ color: currentFile.color }} />
-            {currentFile.language.toUpperCase()}
-          </span>
-          <span style={{ color: '#ffffff60' }}>
-            {lineCount} lines
-          </span>
-          <span style={{ color: '#ffffff60' }}>
-            {currentContent.length} chars
+          <div className="flex gap-6">
+            <span>{currentCode.split('\n').length} lines</span>
+            <span>{currentCode.length.toLocaleString()} chars</span>
+            <span>{getFileSize(currentCode)}</span>
+          </div>
+          <span 
+            className="px-2 py-1 rounded text-xs font-medium"
+            style={{
+              background: 'rgba(16, 185, 129, 0.2)',
+              color: '#10B981',
+            }}
+          >
+            {currentTab?.language.toUpperCase()}
           </span>
         </div>
-        
-        <div className="flex items-center gap-1">
-          <Zap size={12} style={{ color: chlorophyTheme.colors.primary }} />
-          <span style={{ color: chlorophyTheme.colors.primary }}>
-            Live Code
-          </span>
-        </div>
-      </div>
+      )}
     </div>
   );
-}
+};
+
+export default CodePanel;

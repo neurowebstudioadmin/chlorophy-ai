@@ -39,7 +39,6 @@ export default function ChatInterface({ onCodeGenerated, onGenerationStart, isGe
     return keywords.some(keyword => lowerText.includes(keyword));
   };
 
-  // Chat con AI (fa domande)
   const handleChat = async () => {
     if (!prompt.trim()) {
       setError('Per favore, descrivi cosa vuoi creare o modificare');
@@ -59,18 +58,17 @@ export default function ChatInterface({ onCodeGenerated, onGenerationStart, isGe
     setPrompt('');
     setIsGenerating(true);
 
-    // Se ha già generato E la richiesta è una modifica → USA REFINE
-    if (hasGeneratedOnce && isRefinementRequest(currentPrompt) && generatedCode) {
-      console.log('🔧 Detected refinement request:', currentPrompt);
-      await handleRefine(newHistory, currentPrompt);
-      return;
-    }
-
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/chat`, {
+      // ✅ SOLA MODIFICA: Cambiato "message" in "messages"
+      const response = await fetch('http://localhost:3001/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newHistory })
+        body: JSON.stringify({ 
+          messages: [{  // <-- QUI LA CORREZIONE
+            role: "user",
+            content: currentPrompt
+          }]
+        })
       });
 
       const data = await response.json();
@@ -79,16 +77,22 @@ export default function ChatInterface({ onCodeGenerated, onGenerationStart, isGe
         const aiMessage = { role: 'assistant', content: data.response };
         setMessages(prev => [...prev, aiMessage]);
         
-        const updatedHistory = [...newHistory, { role: 'assistant', content: data.response }];
-        setConversationHistory(updatedHistory);
-        
-        // Mostra bottone se risposta contiene "Genera" o dopo 4+ messaggi
-        const isPreProcessedResponse = data.response.includes('Genera Sito Web') || 
-                               data.response.includes('Generate Website') ||
-                               data.response.includes('Generar Sitio Web');
-
-        if (isPreProcessedResponse || (updatedHistory.length >= 4 && !hasGeneratedOnce)) {
-          setShowGenerateButton(true);
+        // Se il backend dice di generare, chiama handleGenerate
+        if (data.shouldGenerate) {
+          console.log('🚀 Auto-generating from chat response');
+          // Aggiungi l'AI message alla chat
+          setConversationHistory(prev => [...prev, { role: 'assistant', content: data.response }]);
+          // Chiama generate con il prompt originale
+          await handleGenerateWithPrompt(data.originalPrompt || currentPrompt);
+        } else {
+          // Altrimenti continua la conversazione
+          const updatedHistory = [...newHistory, { role: 'assistant', content: data.response }];
+          setConversationHistory(updatedHistory);
+          
+          // Mostra bottone solo dopo alcune interazioni
+          if (updatedHistory.length >= 2) {
+            setShowGenerateButton(true);
+          }
         }
       } else {
         setError(data.error || 'Errore nella conversazione');
@@ -100,6 +104,130 @@ export default function ChatInterface({ onCodeGenerated, onGenerationStart, isGe
       setIsGenerating(false);
     }
   };
+
+  // Nuova funzione per generare con prompt specifico
+  const handleGenerateWithPrompt = async (generationPrompt) => {
+  if (!userId) {
+    setError('Per favore effettua il login per generare un sito');
+    return;
+  }
+
+  setIsGenerating(true);
+  setShowGenerateButton(false);
+  setShowUpgradeAlert(false);
+  
+  if (onGenerationStart) {
+    onGenerationStart(false);
+  }
+  
+  setProgressMessage('✨ Perfetto! Sto generando il tuo sito...');
+
+  const progressMessages = [
+    '✨ Perfetto! Sto generando il tuo sito...',
+    '🎨 Creando la struttura HTML...',
+    '💅 Applicando CSS e design...',
+    '⚙️ Aggiungendo JavaScript e interattività...',
+    '🚀 Quasi pronto! Ultimi ritocchi...'
+  ];
+
+  let progressIndex = 0;
+  const progressInterval = setInterval(() => {
+    progressIndex++;
+    if (progressIndex < progressMessages.length) {
+      setProgressMessage(progressMessages[progressIndex]);
+    }
+  }, 3000);
+
+  try {
+    console.log('🚀 Sending generate request for prompt:', generationPrompt);
+    
+    // ✅ USA LA STESSA LOGICA DI handleGenerate MA CON messages COSTRUITE DAL PROMPT
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        messages: [{
+          role: "user",
+          content: generationPrompt
+        }],
+        userId: userId
+      })
+    });
+
+    const data = await response.json();
+    clearInterval(progressInterval);
+
+    // Handle insufficient credits (402 status)
+    if (response.status === 402) {
+      setProgressMessage('');
+      setShowUpgradeAlert(true);
+      setCreditsNeeded(data.creditsNeeded || 1);
+      
+      const errorMsg = { 
+        role: 'assistant', 
+        content: `⚠️ Crediti insufficienti! Hai ${data.creditsAvailable || 0} crediti, ma servono ${data.creditsNeeded || 1} per generare questo sito. ${data.upgradePrompt || 'Aggiorna il tuo piano!'}`,
+      };
+      setMessages(prev => [...prev, errorMsg]);
+      setIsGenerating(false);
+      return;
+    }
+
+    if (data.success) {
+      setProgressMessage('✅ Sito generato con successo!');
+      
+      console.log('✅ Generation completed!');
+      console.log('🎯 Steps:', data.generation?.steps_completed, '/', data.generation?.total_steps);
+      console.log('💳 Credits used:', data.credits?.used, '| Remaining:', data.credits?.remaining);
+      console.log('⏱️ Duration:', data.generation?.duration_seconds, 's');
+      
+      // Update credits in parent
+      if (onCreditsUpdate && data.credits?.remaining !== undefined) {
+        onCreditsUpdate(data.credits.remaining);
+      }
+      
+      // Send code to builder (will trigger streaming)
+      onCodeGenerated(data.code, data);
+      
+      // SALVA PROGETTO AUTOMATICAMENTE IN DATABASE
+      try {
+        console.log('💾 Saving project to database...');
+        await projectsService.saveAIWebsite(userId, data.code, data.generation?.id);
+        console.log('✅ Project saved to database!');
+      } catch (saveError) {
+        console.error('⚠️ Failed to save project (non-blocking):', saveError);
+      }
+      
+      setHasGeneratedOnce(true);
+      
+      const successMsg = { 
+        role: 'assistant', 
+        content: `✅ Sito web generato con successo! 
+        
+📊 Dettagli:
+• Step completati: ${data.generation?.steps_completed || '?'}
+• Tempo: ${data.generation?.duration_seconds || '?'}s
+• Crediti usati: ${data.credits?.used || '?'}
+• Crediti rimanenti: ${data.credits?.remaining || '?'}
+
+Guarda l'anteprima a destra! Se vuoi modifiche, scrivimi pure! 🚀`,
+        tokensUsed: data.tokensUsed
+      };
+      setMessages(prev => [...prev, successMsg]);
+      
+      setTimeout(() => setProgressMessage(''), 2000);
+    } else {
+      setError(data.error || 'Errore nella generazione');
+      setProgressMessage('');
+    }
+  } catch (err) {
+    clearInterval(progressInterval);
+    setError('Errore di rete. Controlla che il backend sia attivo.');
+    setProgressMessage('');
+    console.error(err);
+  } finally {
+    setIsGenerating(false);
+  }
+};
 
   // Refine (correzioni immediate)
   const handleRefine = async (history, userRequest) => {
@@ -276,7 +404,7 @@ export default function ChatInterface({ onCodeGenerated, onGenerationStart, isGe
         }
         
         // Send code to builder (will trigger streaming)
-        onCodeGenerated(data.code);
+        onCodeGenerated(data.code, data);
         
         // 🆕 SALVA PROGETTO AUTOMATICAMENTE IN DATABASE
         try {
